@@ -246,7 +246,16 @@ LePageViewModel >> printPageSummary [
 LePageViewModel >> printPageSummaryLimitedTo: aNumber [
 	"Return a short textual representation of the content of the page"
 	<return: #String>
-	^ self pageModel printPageSummaryLimitedTo: aNumber
+	^ String 
+		streamContents: [ :aStream | 
+			self pageModel
+				allChildrenDepthFirstDo: [ :eachChild | 
+					eachChild contentAsString asString
+						do: [ :eachCharacter | 
+							eachCharacter isLineSeparator
+								ifTrue: [ aStream space ]
+								ifFalse: [ aStream nextPut: eachCharacter ] ] ] ]
+		limitedTo: aNumber
 ]
 
 { #category : #'api - page' }
