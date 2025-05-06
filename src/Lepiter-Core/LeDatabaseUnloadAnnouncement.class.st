@@ -9,3 +9,13 @@ LeDatabaseUnloadAnnouncement >> database [
 
 	^ content
 ]
+
+{ #category : #printing }
+LeDatabaseUnloadAnnouncement >> printOn: aStream [
+	super printOn: aStream.
+
+	aStream
+		nextPut: $(;
+		print: self database;
+		nextPut: $)
+]

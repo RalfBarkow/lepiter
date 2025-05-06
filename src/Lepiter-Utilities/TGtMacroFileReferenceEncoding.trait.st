@@ -1,5 +1,6 @@
 "
-TGtMacroStringEncoding provides convenience methods to convert FileReferences to and from strings, allowing ${method:name=FileLocator class>>#supportedOrigins}$ as macro names encoded with curly-braces. 
+TGtMacroStringEncoding provides convenience methods to convert FileReferences to and from strings, allowing {{gtMethod:name=FileLocator class>>#supportedOrigins}} as macro names encoded with curly-braces. 
+
 "
 Trait {
 	#name : #TGtMacroFileReferenceEncoding,
@@ -16,7 +17,7 @@ TGtMacroFileReferenceEncoding >> decodeFileReferenceString: aString [
 	| namedDirectories regex name path |
 
 	namedDirectories := (FileLocator supportedOrigins collect: [ :origin | 
-		origin -> (FileLocator origin: origin) ]) asDictionary.
+		origin -> (FileLocator origin: origin) ]) asGtStringContentDictionary.
 	"TODO: Add support for additional named directories"
 	"namedDirectories at: #dbParentDirectory put: localRoot parent."
 	regex := '\{([a-zA-Z]+)\}(.*)' asRegex.

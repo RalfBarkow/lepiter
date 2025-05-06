@@ -26,7 +26,10 @@ LePharoSnippetElement >> initialize [
 	editorElement := GtSourceCoderEditorElement new.
 	editorElement padding: (BlInsets top: 5 left: 7 bottom: 5 right: 0).
 	editorElement margin: BlInsets empty.
-	editorElement editor addEventHandler: (LeEditorReachedBorderEventHandler new snippetElement: self).
+	editorElement editor 
+		addEventHandler: (LeEditorReachedBorderEventHandler new 
+			snippetElement: self);
+		ensureNoUndoRedoShortcuts.
 	
 	self registerSpawnBelowHandler.
 	self initializeSpawnDownElements
@@ -47,28 +50,15 @@ LePharoSnippetElement >> onPageChildEvaluated: aLeUIPageChildEvaluationAnnouncem
 	self coder requestStyleSourceText.
 ]
 
-{ #category : #'api - snippet view model' }
-LePharoSnippetElement >> onSnippetViewModelChanged [
-
-	super onSnippetViewModelChanged.
-	self snippetViewModel setSelfObjectFromBindings.
-]
-
 { #category : #initialization }
 LePharoSnippetElement >> registerSpawnBelowHandler [
 	editorElement
 		when: GtPhlowObjectToSpawn
 		do: [ :aSpawnEvent | 
 			aSpawnEvent spawnDestination isSpawnBelow ifTrue: [ 
-				aSpawnEvent consumed: true. 
-				self fireEvent: (GtPhlowObjectToSpawn new 
-					previousSpawnEvent: aSpawnEvent;
-					tool: aSpawnEvent tool; 
-					sourceElement: aSpawnEvent currentTarget;
-					spawnDestination: aSpawnEvent spawnDestination;
-					in: [ :anNewEvent | 
-						anNewEvent propertyAt: #spawnContainer put: self ];
-					yourself) ] ].
+				self fireEvent: (GtPhlowObjectToSpawn new
+					fromPreviousSpawnEvent: aSpawnEvent;
+					spawnContainer: self)  ] ].
 ]
 
 { #category : #actions }
@@ -100,11 +90,4 @@ LePharoSnippetElement >> unsubscribeFromSnippetViewModel [
 
 	self snippet unsubscribe: self.
 	self coder announcer unsubscribe: self.
-]
-
-{ #category : #'private - updating' }
-LePharoSnippetElement >> updateCoderUIModel [
-	super updateCoderUIModel.
-
-	coderToolbar coderUIModel: self snippetViewModel coderViewModel
 ]

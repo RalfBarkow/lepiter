@@ -1,7 +1,7 @@
 "
 {{gtClass:LeLocalStoreMonitor}} listens to its {{gtClass:LeDatabase}} and saves pages back to disk whenever the page is updated (added, content modified, title changed, removed).
 
-The monitor subscribes to announcements from the database and adds them to a queue of pages to be saved.   After each saveDelay has elapsed it saves all the pages back to the store.  See {{gtMethod:name=LeLocalStoreMonitor>>#defaultDelay}} for the default value.
+The monitor subscribes to announcements from the database and adds them to a queue of pages to be saved.   After each saveDelay has elapsed it saves all the pages back to the store.  See {{gtMethod:name=LeDatabaseStore>>#defaultDelay}} for the default value.
 
 The monitor can be in one of two states:
 
@@ -30,21 +30,15 @@ Class {
 		'removeQueue',
 		'state',
 		'corruptFiles',
-		'announcer'
+		'announcer',
+		'updatePromise'
 	],
 	#classVars : [
-		'NoStartup',
-		'SessionAnnouncer'
+		'SessionAnnouncer',
+		'ShutdownMonitor'
 	],
 	#category : #'Lepiter-Store-LocalJSON-Store'
 }
-
-{ #category : #'system startup' }
-LeLocalStoreMonitor class >> clearNoStartup [
-	"Clear the flag to say that Lepiter startup actions should be ignored"
-
-	NoStartup := false.
-]
 
 { #category : #'api - accessing' }
 LeLocalStoreMonitor class >> database: aLeDatabase root: aFileReference [
@@ -57,10 +51,12 @@ LeLocalStoreMonitor class >> database: aLeDatabase root: aFileReference [
 
 { #category : #'class initialization' }
 LeLocalStoreMonitor class >> initialize [ 
+	"Get notified on session starts so the knowledgebase can be reloaded.
+	GtGemStoneSessionRegistry has its priority set to be notified after LeLocalStoreMonitor"
 
 	SessionManager default 
 		registerUserClassNamed: self name.
-	NoStartup := false.
+
 ]
 
 { #category : #accessing }
@@ -70,27 +66,27 @@ LeLocalStoreMonitor class >> sessionAnnouncer [
 ]
 
 { #category : #'system startup' }
-LeLocalStoreMonitor class >> setNoStartup [
-	"Set the flag to say that Lepiter startup actions should be ignored"
-
-	NoStartup := true.
-]
-
-{ #category : #'system startup' }
 LeLocalStoreMonitor class >> shutDown: quitting [
 	"Announce the shutdown, giving monitors a chance to flush their queues"
+	
+	"If there is a reloading in the process, we will be waiting all the way until reload is complete,
+	then we trigger the shutdown announcement. Since reloading stops the monitor, pausing until
+	reloading is finished allows the monitor to handle the shutdown announcement correctly"
+	self shutdownMonitor critical: [ self sessionAnnouncer announce: LeLocalJSONStoreShutdown new ]
+]
 
-	self sessionAnnouncer announce: LeLocalJSONStoreShutdown new.
+{ #category : #accessing }
+LeLocalStoreMonitor class >> shutdownMonitor [
+
+	^ ShutdownMonitor ifNil: [ ShutdownMonitor := Mutex new ]
 ]
 
 { #category : #'system startup' }
 LeLocalStoreMonitor class >> startUp: resuming [
-	| noStartup |
 
-	noStartup := (Smalltalk commandLine argumentsInclude: LeNoStartupCommandline commandName) | NoStartup.
-
-	(resuming and: [ noStartup not ]) ifTrue: 
+	(resuming and: [ self noLepiterReload not ]) ifTrue: 
 		[ self sessionAnnouncer announce: LeLocalJSONStoreStartup new ]
+
 ]
 
 { #category : #accessing }
@@ -104,12 +100,6 @@ LeLocalStoreMonitor >> corruptFiles [
 	"Answer the receiver's collection of corrupt files"
 
 	^ corruptFiles
-]
-
-{ #category : #'private - accessing' }
-LeLocalStoreMonitor >> defaultDelay [
-
-	^ 30 seconds
 ]
 
 { #category : #'schema updating' }
@@ -130,23 +120,45 @@ LeLocalStoreMonitor >> gtAttachmentsFor: aView [
 		title: 'Attachments';
 		priority: 15;
 		items: [ self attachmentsDirectory directories ];
-		column: 'ID' item: #basename;
-		column: 'Name' item: [ :aDirectory | 
+		column: 'ID' text: #basename;
+		column: 'Name' text: [ :aDirectory | 
 			| allFiles |
 			allFiles := aDirectory files select: [ :aFile | 
 				aFile basename ~= LeAttachment basename ].
 			allFiles size = 1
 				ifTrue: [ allFiles first basename ]
-				ifFalse: [ allFiles size asString, ' attachments' ] ]
-	
+				ifFalse: [ allFiles size asString, ' attachments' ] ];
+		send: [ :aDirectory |
+			LeAttachmentWithDiskStorageData 
+				fromDirectory: aDirectory
+				inDatabase: self database ]
 ]
 
 { #category : #'gt-extensions' }
 LeLocalStoreMonitor >> gtViewCorruptFilesFor: aView [
 	<gtView>
+	(corruptFiles isNil or: [
+		corruptFiles isEmpty]) ifTrue: [ ^ aView empty ].
 	^ aView list
 		title: 'Corrupt files';
+		priority: 4;
 		items: [ self corruptFiles]
+]
+
+{ #category : #accessing }
+LeLocalStoreMonitor >> gtViewDiskFilesFor: aView [
+	"Show the page files as they are on disk"
+	<gtView>
+
+	storage ifNil: [ ^ aView empty ].
+	^ aView columnedList 
+		title: 'Files on disk';
+		priority: 11;
+		items: [ self pagesFromStore
+			collect: [ :page | page title -> (self pageFileReference: page) ] ];
+		column: 'Title' text: [ :each | each key ];
+		column: 'File' text: [ :each | each value basename ];
+		send: [ :each | each value ]
 ]
 
 { #category : #'gt-extensions' }
@@ -154,10 +166,10 @@ LeLocalStoreMonitor >> gtViewStatusDetailsFor: aView [
 	<gtView>
 	^ aView columnedList
 		title: 'Details';
-		priority: 10;
+		priority: 5;
 		items: [ {
-			'Has pengind change' -> self isEmpty not.
-			'Has corrupt files' -> (self corruptFiles size > 0) .
+			'Has pending change' -> self hasChanges.
+			'Has corrupt files' -> self hasCorruptPages .
 			'Is monitor stopped' -> self isRunning not}];
 		column: 'Name' text: #key;
 		column: 'Value' text: #value;
@@ -165,7 +177,12 @@ LeLocalStoreMonitor >> gtViewStatusDetailsFor: aView [
 ]
 
 { #category : #testing }
-LeLocalStoreMonitor >> hasCorruptFiles [
+LeLocalStoreMonitor >> hasChanges [
+	^ self isEmpty not
+]
+
+{ #category : #testing }
+LeLocalStoreMonitor >> hasCorruptPages [
 	"Answer a boolean indicating whether the receiver is aware of any corrupt files"
 
 	^ corruptFiles isNotEmpty 
@@ -202,23 +219,43 @@ LeLocalStoreMonitor >> isRunning [
 LeLocalStoreMonitor >> isRunningCleanly [
 	"Answer a boolean indicating whether the receiver is running without any known issues"
 
-	^ state = #running and: [ self hasCorruptFiles not ]
+	^ state = #running and: [ self hasCorruptPages not ]
+]
+
+{ #category : #testing }
+LeLocalStoreMonitor >> isVolatileMonitor [
+	^ false
 ]
 
 { #category : #private }
-LeLocalStoreMonitor >> loadCorruptFilenames [
+LeLocalStoreMonitor >> loadCorruptPages [
 	"Load the list of corrupt files (which should of course be empty)"
 
+	"Two images sharing a lepiter directory can cause a race condition if one of the images removes the directory.
+	While this is bad practice, guard against it by ensuring the directory exists."
+	localRoot ensureCreateDirectory.
 	corruptFiles := #('*.corrupt' '*.duplicate') flatCollect: [ :pattern |
 		localRoot childrenMatching: pattern ]
 ]
 
 { #category : #'startup-shutdown' }
-LeLocalStoreMonitor >> primitiveReload [
+LeLocalStoreMonitor >> primitiveReloadWithErrorStrategy: aContentReloadErrorStrategy [
 	"Reload the receiver's database."
 
-	super primitiveReload.
+	self clearDatabaseProperties.
 	LeDatabaseReload new
+		monitor: self;
+		contentReloadErrorStrategy:  aContentReloadErrorStrategy;
+		reload
+]
+
+{ #category : #'startup-shutdown' }
+LeLocalStoreMonitor >> primitiveReloadWithPageDeletion [
+	"Reload the receiver's database."
+
+	self clearDatabaseProperties.
+	LeDatabaseReload new
+		enablePageDeletion;
 		monitor: self;
 		reload
 ]
@@ -300,12 +337,25 @@ LeLocalStoreMonitor >> queueSave: aPage [
 
 { #category : #'startup-shutdown' }
 LeLocalStoreMonitor >> reload [
+	self reloadWithErrorStrategy: LeDatabaseContentReloadErrorStrategy forkDebuggerOnErrorStrategy
+]
+
+{ #category : #'startup-shutdown' }
+LeLocalStoreMonitor >> reloadWithErrorStrategy: aContentReloadErrorStrategy [
 	"Reload the receiver's database.
 	If the receiver is part of a logical database, defer to the logical database to coordinate reloads across all concrete databases."
 
 	(database hasParentDatabase and: [ database parent hasProperties ]) ifTrue: 
-		[ ^ database parent reloadRequestFrom: database ].
-	self primitiveReload.
+		[ ^ database parent 
+				reloadRequestFrom: database
+				withErrorStrategy: aContentReloadErrorStrategy ].
+	
+	self primitiveReloadWithErrorStrategy: aContentReloadErrorStrategy.
+]
+
+{ #category : #'startup-shutdown' }
+LeLocalStoreMonitor >> reloadWithNotificationOnError [
+	self reloadWithErrorStrategy: LeDatabaseContentReloadErrorStrategy singleNotificationOnErrorStrategy
 ]
 
 { #category : #private }
@@ -375,21 +425,40 @@ LeLocalStoreMonitor >> savePage: aPage [
 
 { #category : #private }
 LeLocalStoreMonitor >> scheduleNextUpdate [
+
 	"Queue the next update to be run after the saveDelay duration"
 
 	saveDelay isZero ifTrue: [ ^ self ].
-	BlTaskAtQueue default
-		schedule: 
-			[ state = #running ifTrue:
-				[ BlTktWorkerProvider highUICPUBoundPool schedule: 
-					[ self runTimedUpdate ] asBlTktCommand ] ]
-		at: DateAndTime now + saveDelay.
+
+	updatePromise ifNotNil: [ updatePromise cancelSoft ].
+
+	updatePromise := ([ self runTimedUpdate ] asAsyncFuture 
+		delayed: saveDelay) await: (AsyncFutureExecutionConfiguration new 
+			customGroup: #Lepiter;
+			errorHandler: AsyncPassExceptionHandler new)
+]
+
+{ #category : #notifications }
+LeLocalStoreMonitor >> showNotificationForException: anException withMessage: aMessage [ 
+	^ GtObjectNotificationMessage new
+		message: aMessage;
+		tooltip: 'Inspect loading error';
+		object: anException;
+		showNotifications;
+		registerNotifications
+]
+
+{ #category : #'system startup' }
+LeLocalStoreMonitor >> shutDown [
+	self updateEntries
 ]
 
 { #category : #'startup-shutdown' }
 LeLocalStoreMonitor >> startMonitoring [
 	state = #running ifTrue: [ ^ self ].
 	state := #running.
+	
+	self announce: (LeLocalStoreMonitorStarted new monitor: self).
 	
 	database weak when: LeSnippetContentChanged send: #processSnippetContentChanged: to: self.
 	database weak when: LeContentTreeChanged send: #processContentTreeChanged: to: self.
@@ -398,10 +467,10 @@ LeLocalStoreMonitor >> startMonitoring [
 	database weak when: LePageTitleChanged send: #processPageTitleChanged: to: self.
 	database weak when: LeExplicitLinksChange send: #processExplicitLinksChanged: to: self.
 	
-	self class sessionAnnouncer weak when: LeLocalJSONStoreShutdown send: #updateEntries to: self.
+	self class sessionAnnouncer weak when: LeLocalJSONStoreShutdown send: #shutDown to: self.
 	self class sessionAnnouncer weak when: LeLocalJSONStoreStartup send: #startUp to: self.
 	self scheduleNextUpdate.
-	self loadCorruptFilenames.
+	self loadCorruptPages.
 ]
 
 { #category : #'system startup' }
@@ -417,21 +486,48 @@ LeLocalStoreMonitor >> stopMonitoring [
 	database unsubscribe: self.
 	self class sessionAnnouncer unsubscribe: self.
 	state := #stopped.
-	self updateEntries.
+
+	self announce: (LeLocalStoreMonitorStopped new monitor: self).
+
+	self updateEntries
 ]
 
 { #category : #private }
 LeLocalStoreMonitor >> submitReload [
 
-	[ self reload ] asBlTktCommand 
-		name: 'Lepiter Database Reload';
-		scheduleInPool: BlTktWorkerProvider highUIExternalResourceBoundPool
+	([ self class shutdownMonitor 
+		critical: [ self reloadWithNotificationOnError ] ]
+			asAsyncFuture await: (AsyncFutureExecutionConfiguration new 
+				customGroup: #Lepiter))
+					then: [ ]
+					otherwise: [ :anException |
+						anException freeze.
+						self 
+							showNotificationForException: anException
+							withMessage:(String streamContents: [ :aStream |
+								aStream 
+									<< 'Fatal error during Lepiter reload: ';
+									<< anException description;
+									cr; cr;
+									<< 'The database can be in an inconsistent state. ';
+									<< 'Resolve this problem before continuing to use the image! See "How to fix Lepiter loading errors".' ]) ]
+]
+
+{ #category : #accessing }
+LeLocalStoreMonitor >> uidsInStore [
+	"Answer the Set of page UIDs in the receiver"
+
+	^ (storage dbFilesIn: self localRoot)
+		collect: [ :fr | fr basenameWithoutExtension ]
+		as: Set.
 ]
 
 { #category : #private }
 LeLocalStoreMonitor >> updateEntries [
 	"Perform all the queued updates"
-	| oldSaveQueue oldRemoveQueue newSaveQueue newRemoveQueue savePages removePageFiles page |
+	| oldSaveQueue oldRemoveQueue newSaveQueue newRemoveQueue savePages removePageFiles page sendChanged |
+	
+	sendChanged := self hasChanges.
 
 	newSaveQueue := WaitfreeQueue new.
 	newRemoveQueue := WaitfreeQueue new.
@@ -455,7 +551,18 @@ LeLocalStoreMonitor >> updateEntries [
 	removePageFiles do: [ :each |
 		self removePageNowNamed: each ].
 
-	self announce: (LeLocalStoreMonitorSaved new monitor: self)
+	self announce: (LeStoreMonitorSaved new monitor: self).
+	
+	sendChanged ifTrue: [
+		self announce: (LeStoreMonitorSavedChanges new monitor: self) ]
+]
+
+{ #category : #'private - accessing' }
+LeLocalStoreMonitor >> updatePromise [
+	"Answer the promise that saves queued changes.
+	This is internal state, for debugging only."
+
+	^ updatePromise
 ]
 
 { #category : #accessing }

@@ -4,7 +4,18 @@ Class {
 	#category : #'Lepiter-Pharo-Examples'
 }
 
-{ #category : #'examples - snippets' }
+{ #category : #asserting }
+LePharoSnippetUpdateExamples >> assertModificationAnnouncements: anAnnouncementsCollection [
+	self 
+		assertOneModificationAnnouncementIn: anAnnouncementsCollection 
+		ofType: LeSnippetTextChanged 
+		do: [ :anAnnouncement |
+			self 
+				assert: anAnnouncement snippet string 
+				equals: '1+2+3' ]
+]
+
+{ #category : #asserting }
 LePharoSnippetUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 	self assert: targetSnippet code equals: '1+2+3'.
 ]
@@ -12,6 +23,7 @@ LePharoSnippetUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 { #category : #'examples - snippets' }
 LePharoSnippetUpdateExamples >> createTargetSnippet [
 	<gtExample>
+	<return: #LePharoSnippet>
 	^ LePharoSnippet code: '1+2'
 ]
 

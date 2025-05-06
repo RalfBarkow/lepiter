@@ -1,5 +1,6 @@
 "
-I provide examples to easily show ${class:BlElement}$ instances in a ${class:BlSpace}$.
+I provide examples to easily show {{gtClass:BlElement}} instances in a {{gtClass:BlSpace}}.
+
 "
 Trait {
 	#name : #TLeSpaceExamples,
@@ -17,11 +18,14 @@ TLeSpaceExamples >> closeSpace: aSpace with: anElement [
 { #category : #'examples - support' }
 TLeSpaceExamples >> newSpace [
 	<gtExample>
+	<return: #BlSpace>
+	<return: #BlSpace>
+	<return: #Error>
 	| aSpace |
 	aSpace := BlSpace new.
 	aSpace host: BlHeadlessHost new.
 	aSpace title: 'Async Element Examples'.
-	aSpace extent: 600@400.
+	aSpace extent: 600 @ 400.
 	aSpace withHalos.
 	^ aSpace
 ]
@@ -58,9 +62,10 @@ TLeSpaceExamples >> showInSpace: aBlElement [
 { #category : #'examples - support' }
 TLeSpaceExamples >> waitTaskExecutionIn: anElement [
 	| aSemaphore isExpired |
+
 	aSemaphore := Semaphore new.
 	anElement enqueueTask: (BlTaskAction new action: [ 
 		aSemaphore signal ]).
 	isExpired := aSemaphore waitTimeoutSeconds: 10.
-	self assert: isExpired not description: 'Task execution semaphore expired'.
+	self assert: isExpired not description: [ 'Task execution semaphore expired, queue=', anElement taskQueue printString ].
 ]

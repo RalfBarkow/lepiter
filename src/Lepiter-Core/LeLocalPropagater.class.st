@@ -25,5 +25,6 @@ LeLocalPropagater >> order [
 { #category : #'api - promoting' }
 LeLocalPropagater >> propagate: anAnnouncement in: aLeContent [
 	<return: #LeAnnouncement>
-	^ aLeContent announce: anAnnouncement.
+	
+	^ aLeContent announce: anAnnouncement
 ]

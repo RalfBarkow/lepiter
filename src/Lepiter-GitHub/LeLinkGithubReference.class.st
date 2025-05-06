@@ -18,7 +18,7 @@ LeLinkGithubReference >> download [
 LeLinkGithubReference >> gtLiveFor: aView [
 	<gtView>
 	^ aView forward
-		title: 'Raw Data';
+		title: 'Raw data';
 		priority: 20;
 		object: [ self rawData ];
 		view: #gtItemsFor:;

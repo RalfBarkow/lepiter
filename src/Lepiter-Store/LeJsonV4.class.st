@@ -3,48 +3,85 @@ Class {
 	#superclass : #Object,
 	#traits : 'TGtUniqueInstance',
 	#classTraits : 'TGtUniqueInstance classTrait',
+	#instVars : [
+		'newReader',
+		'newWriter',
+		'mutex'
+	],
 	#category : #'Lepiter-Store-JsonV4'
 }
+
+{ #category : #loading }
+LeJsonV4 class >> loadFile: aFileReference [
+
+	^ self uniqueInstance loadFile: aFileReference
+]
 
 { #category : #private }
 LeJsonV4 >> allClassMappingsFor: aNeoJSONMapper [ 
 
-	LeModel allSubclassesDo: [ :leClass |
-		leClass leJsonV4MappingFor: aNeoJSONMapper ].
-	Date leJsonV4MappingFor: aNeoJSONMapper.
-	DateAndTime leJsonV4MappingFor: aNeoJSONMapper.
-	UUID leJsonV4MappingFor: aNeoJSONMapper.
-	FileReference leJsonV4MappingFor: aNeoJSONMapper.
+	(SystemNavigation default allImplementorsOf: #leJsonV4Name) do: [ :method |
+		| jsonName |
+		jsonName := method 
+							gtValueWithReceiver: method methodClass soleInstance 
+							possibleArguments: #().
+		jsonName ifNotNil: [ method methodClass instanceSide leJsonV4MappingFor: aNeoJSONMapper ] ].
 
+]
+
+{ #category : #testing }
+LeJsonV4 >> canSerialize: anObject [
+	"Answer a boolean indicating whether the supplied class can be serialised"
+
+	^ anObject class class includesSelector: #leJsonV4Name
 ]
 
 { #category : #'api - serializing' }
 LeJsonV4 >> deserialize: aStream [
-	"Deserialise the supplied object. aLeClass is a subclass of LeModel"
+	"Deserialise the supplied stream"
+	| object |
 
-	^ self newReader 
+	object := self newReader 
 		on: aStream;
 		next.
+	"If the deserialised object is a Dictionary, the __schema should be removed"
+	object isDictionary ifTrue:
+		[ object removeKey: '__schema' ifAbsent: [ ] ].
 
+	^ object
+]
+
+{ #category : #initialization }
+LeJsonV4 >> initialize [
+
+	super initialize.
+	mutex := Mutex new.
+]
+
+{ #category : #loading }
+LeJsonV4 >> loadFile: aFileReference [
+
+	^ aFileReference asFileReference readStreamDo: [ :stream |
+		self deserialize: stream ]
 ]
 
 { #category : #initialization }
 LeJsonV4 >> newReader [ 
-	| newReader |
-
-	newReader := LeJsonV4Reader new.
-	self allClassMappingsFor: newReader.
-	^ newReader
-
+	newReader ifNil: [ mutex critical: [ | reader |
+		reader := LeJsonV4Reader new.
+		self allClassMappingsFor: reader.
+		newReader := reader ] ].
+	^ newReader copy
 ]
 
 { #category : #initialization }
 LeJsonV4 >> newWriter [ 
-	| newWriter |
 
-	newWriter := LeJsonV4Writer new.
-	self allClassMappingsFor: newWriter.
-	^ newWriter 
+	newWriter ifNil: [ mutex critical: [ | writer |
+		writer := LeJsonV4Writer new.
+		self allClassMappingsFor: writer.
+		newWriter := writer ] ].
+	^ newWriter copy
 ]
 
 { #category : #private }
@@ -53,6 +90,13 @@ LeJsonV4 >> schemaFor: aKey [
 
 	^ LeModel allSubclasses detect: 
 		[ :each | each leJsonV4Name = aKey ].
+]
+
+{ #category : #accessing }
+LeJsonV4 >> serialize: aLeModel [
+
+	^ String streamContents: [ :stream | 
+		  self serialize: aLeModel on: stream prettyPrint: false ]
 ]
 
 { #category : #'api - serializing' }
@@ -64,4 +108,11 @@ LeJsonV4 >> serialize: aLeModel on: aStream prettyPrint: aBoolean [
 		prettyPrint: aBoolean;
 		nextPut: aLeModel.
 
+]
+
+{ #category : #accessing }
+LeJsonV4 >> serializePretty: aLeModel [
+
+	^ String streamContents: [ :stream | 
+		  self serialize: aLeModel on: stream prettyPrint: true ]
 ]

@@ -2,7 +2,6 @@
 I am {{gtClass:LeRootItemsSelector}}.
 I select the parent itself as a root item:
 {{gtMethod:LeParentSelector>>#rootsFor:into:|expanded}}
-I am used by {{gtClass:LeBlockTreeElement}}.
 
 "
 Class {
@@ -10,7 +9,7 @@ Class {
 	#superclass : #LeRootItemsSelector,
 	#traits : 'TGtUniqueInstance',
 	#classTraits : 'TGtUniqueInstance classTrait',
-	#category : #'Lepiter-Core-Utility'
+	#category : 'Lepiter-Core-Utility'
 }
 
 { #category : #'api - collect' }

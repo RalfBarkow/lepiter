@@ -4,7 +4,16 @@ Class {
 	#category : #'Lepiter-Snippet-Picture-Examples'
 }
 
-{ #category : #'examples - snippets' }
+{ #category : #asserting }
+LePictureSnippetUpdateExamples >> assertModificationAnnouncements: anAnnouncementsCollection [
+	self 
+		assertOneModificationAnnouncementIn: anAnnouncementsCollection 
+		ofType: LeSnippetContentChanged 
+		do: [ :anAnnouncement |
+			"Nothing to assert here" ]
+]
+
+{ #category : #asserting }
 LePictureSnippetUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 	self 
 		assert: targetSnippet urlString 
@@ -14,8 +23,8 @@ LePictureSnippetUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 { #category : #'examples - snippets' }
 LePictureSnippetUpdateExamples >> createTargetSnippet [
 	<gtExample>
-	^ LePictureSnippet new 
-		urlString: 'www.example.com/picture1'
+	<return: #LePictureSnippet>
+	^ LePictureSnippet new urlString: 'www.example.com/picture1'
 ]
 
 { #category : #'examples - snippets' }

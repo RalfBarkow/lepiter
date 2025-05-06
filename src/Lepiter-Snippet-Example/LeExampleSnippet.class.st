@@ -1,3 +1,6 @@
+"
+An example is like a test that returns an object. Beside the utility for testing, examples can also be used for documentation purposes through an exmaple snippet.
+"
 Class {
 	#name : #LeExampleSnippet,
 	#superclass : #LeSnippet,
@@ -8,7 +11,8 @@ Class {
 		'noCode',
 		'previewExpanded',
 		'previewShowSelector',
-		'previewHeight'
+		'previewHeight',
+		'previewSelectSelector'
 	],
 	#category : #'Lepiter-Snippet-Example-Snippet'
 }
@@ -18,7 +22,17 @@ LeExampleSnippet class >> contextMenuItemSpecification [
 	<leSnippetSpecification>
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'Example'
+		title: self description
+]
+
+{ #category : #accessing }
+LeExampleSnippet class >> defaultPreviewShowSelector [
+	^ #gtViewsFor:
+]
+
+{ #category : #'api - accessing menu' }
+LeExampleSnippet class >> description [
+	^ 'Example'
 ]
 
 { #category : #factory }
@@ -37,6 +51,7 @@ LeExampleSnippet class >> leJsonV4AttributeMapping [
 			#exampleSelector->#exampleSelector. 
 			#previewHeight->#previewHeight. 
 			#previewShowSelector->#previewShowSelector. 
+			#previewSelectSelector->#previewSelectSelector. 
 			#exampleBehaviorName->#exampleBehaviorName. 
 			#codeExpanded->#codeExpanded. 
 			#previewExpanded->#previewExpanded. 
@@ -50,47 +65,76 @@ LeExampleSnippet class >> leJsonV4Name [
 	^ 'exampleSnippet'
 ]
 
+{ #category : #accessing }
+LeExampleSnippet >> acceptVisitor: aVisitor [
+	^ aVisitor visitExampleSnippet: self
+]
+
 { #category : #'api - accessing' }
 LeExampleSnippet >> asAnnotationString [
-	^ String streamContents: [ :aStream |	
-		aStream
-			nextPutAll: (self exampleBehaviorName ifNil: [ '' ]).
+	^ self asAnnotationStringWithChanges: Dictionary new
+]
 
-		(self hasExampleBehaviorName and: [ self hasExampleSelector ])
-			ifTrue: [ aStream nextPutAll: '>>#' ].
+{ #category : #'api - accessing' }
+LeExampleSnippet >> asAnnotationStringWithChanges: aDictionary [
+	^ String
+		streamContents: [ :aStream | 
+			| className selectorName value |
+			className := aDictionary
+					at: #exampleBehaviorName
+					ifAbsent: [ self exampleBehaviorName ].
+			selectorName := aDictionary
+					at: #exampleSelector
+					ifAbsent: [ self exampleSelector ].
 
-		aStream
-			nextPutAll: (self exampleSelector ifNil: [ '' ]).
+			aStream nextPutAll: (className ifNil: [ '' ]).
 
-		self noCode = self defaultNoCode
-			ifFalse: [
-				aStream
-					nextPutAll: ' | noCode=';
-					print: self noCode ].
-				
-		self codeExpanded = self defaultCodeExpanded
-			ifFalse: [
-				aStream
-					nextPutAll: ' | codeExpanded=';
-					print: self codeExpanded ].
-		
-		self previewExpanded = self defaultPreviewExpanded
-			ifFalse: [
-				aStream
-					nextPutAll: ' | previewExpanded=';
-					print: self previewExpanded ].
-				
-		self previewShowSelector = self defaultPreviewShowSelector
-			ifFalse: [
-				aStream
-					nextPutAll: ' | previewShow=';
-					print: self previewShowSelector ].
-				
-		self previewHeight = self defaultPreviewHeight
-			ifFalse: [
-				aStream
-					nextPutAll: ' | previewHeight=';
-					print: self previewHeight ] ]
+			(className notNil and: [ selectorName notNil ])
+				ifTrue: [ aStream nextPutAll: ' >> #' ].
+
+			aStream nextPutAll: (selectorName ifNil: [ '' ]).
+
+			value := aDictionary at: #noCode ifAbsent: [ self noCode ].
+			value = self defaultNoCode
+				ifFalse: [ aStream
+						nextPutAll: ' | noCode=';
+						print: value ].
+
+			value := aDictionary at: #codeExpanded ifAbsent: [ self codeExpanded ].
+			value = self defaultCodeExpanded
+				ifFalse: [ aStream
+						nextPutAll: ' | codeExpanded=';
+						print: value ].
+
+			value := aDictionary at: #previewExpanded ifAbsent: [ self previewExpanded ].
+			value = self defaultPreviewExpanded
+				ifFalse: [ aStream
+						nextPutAll: ' | previewExpanded=';
+						print: value ].
+
+			value := aDictionary
+					at: #previewShowSelector
+					ifAbsent: [ self previewShowSelector ].
+			value = self defaultPreviewShowSelector
+				ifFalse: [ aStream
+						nextPutAll: ' | previewShow=';
+						nextPut: $#;
+						nextPutAll: value asString ].
+
+			value := aDictionary
+					at: #previewSelectSelector
+					ifAbsent: [ self previewSelectSelector ].
+			value
+				ifNotNil: [ aStream
+						nextPutAll: ' | previewSelect=';
+						nextPut: $#;
+						nextPutAll: value asString ].
+
+			value := aDictionary at: #previewHeight ifAbsent: [ self previewHeight ].
+			value = self defaultPreviewHeight
+				ifFalse: [ aStream
+						nextPutAll: ' | previewHeight=';
+						print: value ] ]
 ]
 
 { #category : #'api - accessing' }
@@ -98,6 +142,45 @@ LeExampleSnippet >> asSnippetViewModel [
 	<return: #LeSnippetViewModel>
 
 	^ LeExampleSnippetViewModel new snippetModel: self
+]
+
+{ #category : #testing }
+LeExampleSnippet >> canMoveToAnotherDatabase [
+	^ true
+]
+
+{ #category : #accessing }
+LeExampleSnippet >> changeToRenameClass: oldName to: newName [
+	self instanceClassName = oldName ifFalse: [ ^ nil ].
+	^ LeExampleSnippetChange new
+		snippet: self;
+		change: #exampleBehaviorName
+			to: (self isForMetaclass
+					ifTrue: [ newName , ' class' ]
+					ifFalse: [ newName asSymbol ]);
+		yourself
+]
+
+{ #category : #accessing }
+LeExampleSnippet >> changeToRenameSelector: oldName to: newName using: aRewriter [
+	| change |
+	change := LeExampleSnippetChange new snippet: self.
+	#(exampleSelector previewSelectSelector previewShowSelector)
+		do: [ :each | (self perform: each) = oldName ifTrue: [ change change: each to: newName ] ].
+	^ change hasChanges ifTrue: [ change ] ifFalse: [ nil ]
+]
+
+{ #category : #accessing }
+LeExampleSnippet >> classAndSelectorReferencesPromise [
+	^ [ | classes selectors |
+	classes := Set new.
+	selectors := Set new.
+	classes add: self instanceClassName.
+	self exampleSelector ifNotNil: [ :sel | selectors add: sel ].
+	self previewSelectSelector ifNotNil: [ :sel | selectors add: sel ].
+	self previewShowSelector ifNotNil: [ :sel | selectors add: sel ].
+	{classes.
+		selectors} ] asAsyncPromise
 ]
 
 { #category : #'api - code expanded' }
@@ -135,15 +218,14 @@ LeExampleSnippet >> contentAsString [
 	^ '{{gtExample:', self asAnnotationString, '}}'
 ]
 
-{ #category : #'api - accessing' }
-LeExampleSnippet >> copyFrom: aLeExampleSnippet [
-	self codeExpanded: aLeExampleSnippet codeExpanded.
-	self exampleBehaviorName: aLeExampleSnippet exampleBehaviorName.
-	self exampleSelector: aLeExampleSnippet exampleSelector.
-	self noCode: aLeExampleSnippet noCode.
-	self previewExpanded: aLeExampleSnippet previewExpanded.
-	self previewHeight: aLeExampleSnippet previewHeight.
-	self previewShowSelector: aLeExampleSnippet previewShowSelector.
+{ #category : #converting }
+LeExampleSnippet >> convertToScript [
+	| newSource ast |
+	ast := self exampleMethodAST.
+	ast ifNil: [ ^ self ].
+	newSource := self snippetSourceFrom: ast body.
+	self addSnippetAfterSelf: (LePharoSnippet new code: newSource).
+	self removeSelf
 ]
 
 { #category : #initialization }
@@ -168,7 +250,14 @@ LeExampleSnippet >> defaultPreviewHeight [
 
 { #category : #initialization }
 LeExampleSnippet >> defaultPreviewShowSelector [
-	^ #gtViewsFor:
+	^ self class defaultPreviewShowSelector
+]
+
+{ #category : #'api - testing' }
+LeExampleSnippet >> doesReferenceExist [
+	^ self hasExampleBehaviorName and: [ 
+		self hasExampleSelector and: [ 
+			self exampleMethod notNil ] ]
 ]
 
 { #category : #'api - example behavior name' }
@@ -187,7 +276,7 @@ LeExampleSnippet >> exampleBehaviorName: aNewExampleBehaviorName [
 	<generatedFrom: #'TGtRobocoderWithPropertyTraitTemplate>>#propertySetterTemplate'>
 
 	(self hasExampleBehaviorName
-		and: [ self exampleBehaviorName = aNewExampleBehaviorName ])
+		and: [ self exampleBehaviorName sameContentAs: aNewExampleBehaviorName ])
 			ifTrue: [ ^ self ].
 	
 	self hasExampleBehaviorName
@@ -197,8 +286,33 @@ LeExampleSnippet >> exampleBehaviorName: aNewExampleBehaviorName [
 			exampleBehaviorName := nil.
 			self onPreviousExampleBehaviorNameUnset: aPreviousExampleBehaviorName ].
 	exampleBehaviorName := aNewExampleBehaviorName.
-	self onNewExampleBehaviorNameSet: aNewExampleBehaviorName.
+	self onNewExampleBehaviorNameSet: exampleBehaviorName.
 	self notifyExampleBehaviorNameChanged
+]
+
+{ #category : #converting }
+LeExampleSnippet >> exampleClass [
+	| name class |
+	name := self instanceClassName.
+	class := Smalltalk globals at: name asSymbol ifAbsent: [ ^ nil ].
+	self isForMetaclass ifTrue: [ class := class class ].
+	^ class
+]
+
+{ #category : #converting }
+LeExampleSnippet >> exampleMethod [
+	^ self exampleClass 
+		ifNotNil: [ :aClass |
+			aClass
+				compiledMethodAt: exampleSelector
+				ifPresent: [ :method | method parseTree ]
+				ifAbsent: [ nil ] ]
+]
+
+{ #category : #converting }
+LeExampleSnippet >> exampleMethodAST [
+	^ self exampleMethod
+		  ifNotNil: [ :method | method parseTree ]
 ]
 
 { #category : #'api - example selector' }
@@ -215,9 +329,11 @@ LeExampleSnippet >> exampleSelector: aNewExampleSelector [
 	<propertySetter: #exampleSelector>
 	<propertyAnnouncement: #LeExampleSnippetExampleSelectorChanged>
 	<generatedFrom: #'TGtRobocoderWithPropertyTraitTemplate>>#propertySetterTemplate'>
+	| newSelector |
 
+	newSelector := aNewExampleSelector ifNotNil: #asSymbol.
 	(self hasExampleSelector
-		and: [ self exampleSelector = aNewExampleSelector ])
+		and: [ self exampleSelector = newSelector ])
 			ifTrue: [ ^ self ].
 	
 	self hasExampleSelector
@@ -226,9 +342,22 @@ LeExampleSnippet >> exampleSelector: aNewExampleSelector [
 			aPreviousExampleSelector := exampleSelector.
 			exampleSelector := nil.
 			self onPreviousExampleSelectorUnset: aPreviousExampleSelector ].
-	exampleSelector := aNewExampleSelector.
-	self onNewExampleSelectorSet: aNewExampleSelector.
+	exampleSelector := newSelector.
+	self onNewExampleSelectorSet: newSelector.
 	self notifyExampleSelectorChanged
+]
+
+{ #category : #'private - subscriptions' }
+LeExampleSnippet >> handleSystemClassAnnouncement: anAnnouncement [
+	(exampleBehaviorName sameContentAs: anAnnouncement classAffected originalName)
+		ifTrue: [ self notifyExampleBehaviorNameChanged ]
+]
+
+{ #category : #'private - subscriptions' }
+LeExampleSnippet >> handleSystemMethodAnnouncement: anAnnouncement [
+	((exampleBehaviorName sameContentAs: anAnnouncement methodClass originalName)
+		and: [ exampleSelector = anAnnouncement selector ])
+		ifTrue: [ self notifyExampleSelectorChanged ]
 ]
 
 { #category : #'api - code expanded' }
@@ -286,6 +415,12 @@ LeExampleSnippet >> hasPreviewHeight [
 ]
 
 { #category : #'api - preview show selector' }
+LeExampleSnippet >> hasPreviewSelectSelector [
+
+	^ previewSelectSelector notNil
+]
+
+{ #category : #'api - preview show selector' }
 LeExampleSnippet >> hasPreviewShowSelector [
 	<return: #Boolean>
 	<propertyTester: #previewShowSelector>
@@ -302,12 +437,41 @@ LeExampleSnippet >> initialize [
 	noCode := self defaultNoCode.
 	previewExpanded := self defaultPreviewExpanded.
 	previewShowSelector := self defaultPreviewShowSelector.
-	previewHeight := self defaultPreviewHeight
+	previewHeight := self defaultPreviewHeight.
+	
+	self subscribeToSystem
 ]
 
-{ #category : #'api - testing' }
-LeExampleSnippet >> isEmpty [ 
-	^ self exampleBehaviorName isNil
+{ #category : #converting }
+LeExampleSnippet >> instanceClassName [
+	^ exampleBehaviorName first: (exampleBehaviorName
+			   indexOf: $ 
+			   ifAbsent: [ exampleBehaviorName size + 1 ]) - 1
+]
+
+{ #category : #converting }
+LeExampleSnippet >> isForMetaclass [
+
+	^ exampleBehaviorName endsWith: ' class'
+]
+
+{ #category : #'private - exporting' }
+LeExampleSnippet >> markdownOn: stream level: anInteger [
+	"Placeholder. What should we do here?"
+
+	anInteger * 4 timesRepeat: [ stream nextPut: Character space ].
+	stream
+		cr;
+		<< '```';
+		cr;
+		<< self contentAsString trimBoth;
+		cr;
+		<< '```';
+		cr.
+	self
+		childrenDo: [ :child | 
+			stream cr.
+			child markdownOn: stream level: anInteger + 1 ]
 ]
 
 { #category : #'api - no code' }
@@ -407,6 +571,15 @@ LeExampleSnippet >> notifyPreviewHeightChanged [
 ]
 
 { #category : #'api - preview show selector' }
+LeExampleSnippet >> notifyPreviewSelectSelectorChanged [
+	
+	self notifyAnnouncement: (LeExampleSnippetPreviewSelectSelectorChanged new
+		source: self;
+		snippet: self;
+		previewSelectSelector: self previewSelectSelector).
+]
+
+{ #category : #'api - preview show selector' }
 LeExampleSnippet >> notifyPreviewShowSelectorChanged [
 	"Override this notify method to announce changes to the property"
 	<propertyChangeNotifier: #previewShowSelector>
@@ -460,6 +633,11 @@ LeExampleSnippet >> onNewPreviewHeightSet: aNewPreviewHeight [
 ]
 
 { #category : #'api - preview show selector' }
+LeExampleSnippet >> onNewPreviewSelectSelectorSet: aNewPreviewSelectSelector [
+	
+]
+
+{ #category : #'api - preview show selector' }
 LeExampleSnippet >> onNewPreviewShowSelectorSet: aNewPreviewShowSelector [
 	"Is sent after a new value of the previewShowSelector is assigned"
 	<propertySetHook: #previewShowSelector>
@@ -506,6 +684,11 @@ LeExampleSnippet >> onPreviousPreviewHeightUnset: aPreviousPreviewHeight [
 	"Is sent after a previous value of the previewHeight is de-assigned"
 	<propertyUnsetHook: #previewHeight>
 	<generatedFrom: #'TGtRobocoderWithPropertyTraitTemplate>>#onPreviousPropertyUnsetHookTemplate'>
+]
+
+{ #category : #'api - preview show selector' }
+LeExampleSnippet >> onPreviousPreviewSelectSelectorUnset: aPreviousPreviewSelectSelector [
+	
 ]
 
 { #category : #'api - preview show selector' }
@@ -575,6 +758,29 @@ LeExampleSnippet >> previewHeight: aNewPreviewHeight [
 	self notifyPreviewHeightChanged
 ]
 
+{ #category : #accessing }
+LeExampleSnippet >> previewSelectSelector [
+	^ previewSelectSelector
+]
+
+{ #category : #'api - preview show selector' }
+LeExampleSnippet >> previewSelectSelector: aNewPreviewSelectSelector [
+
+	(self hasPreviewSelectSelector
+		and: [ self previewSelectSelector = aNewPreviewSelectSelector ])
+			ifTrue: [ ^ self ].
+	
+	self hasPreviewSelectSelector
+		ifTrue: [
+			| aPreviousPreviewSelectSelector |
+			aPreviousPreviewSelectSelector := previewSelectSelector.
+			previewSelectSelector := nil.
+			self onPreviousPreviewSelectSelectorUnset: aPreviousPreviewSelectSelector ].
+	previewSelectSelector := aNewPreviewSelectSelector.
+	self onNewPreviewSelectSelectorSet: aNewPreviewSelectSelector.
+	self notifyPreviewSelectSelectorChanged
+]
+
 { #category : #'api - preview show selector' }
 LeExampleSnippet >> previewShowSelector [
 	<return: #Symbol>
@@ -589,9 +795,11 @@ LeExampleSnippet >> previewShowSelector: aNewPreviewShowSelector [
 	<propertySetter: #previewShowSelector>
 	<propertyAnnouncement: #LeExampleSnippetPreviewShowSelectorChanged>
 	<generatedFrom: #'TGtRobocoderWithPropertyTraitTemplate>>#propertySetterTemplate'>
+	| newSelector |
 
+	newSelector := aNewPreviewShowSelector ifNotNil: [ aNewPreviewShowSelector asSymbol ].
 	(self hasPreviewShowSelector
-		and: [ self previewShowSelector = aNewPreviewShowSelector ])
+		and: [ self previewShowSelector = newSelector ])
 			ifTrue: [ ^ self ].
 	
 	self hasPreviewShowSelector
@@ -600,20 +808,101 @@ LeExampleSnippet >> previewShowSelector: aNewPreviewShowSelector [
 			aPreviousPreviewShowSelector := previewShowSelector.
 			previewShowSelector := nil.
 			self onPreviousPreviewShowSelectorUnset: aPreviousPreviewShowSelector ].
-	previewShowSelector := aNewPreviewShowSelector.
-	self onNewPreviewShowSelectorSet: aNewPreviewShowSelector.
+	previewShowSelector := newSelector.
+	self onNewPreviewShowSelectorSet: newSelector.
 	self notifyPreviewShowSelectorChanged
+]
+
+{ #category : #accessing }
+LeExampleSnippet >> referencedExample [
+	<return: #RGMethodDefinition or: nil>
+	self exampleBehaviorName ifNil: [ ^ nil ].
+	self exampleSelector ifNil: [ ^ nil ].
+	^ GtSystemUtility methodDefinitionFromString: self exampleBehaviorName,'>>#', self exampleSelector
+]
+
+{ #category : #accessing }
+LeExampleSnippet >> referencedExampleSourceCode [
+	^ self referencedExample sourceCode
 ]
 
 { #category : #'api - testing' }
 LeExampleSnippet >> similarTo: anotherExampleSnippet [
 	^ self codeExpanded = anotherExampleSnippet codeExpanded
-		and: [ self exampleBehaviorName = anotherExampleSnippet exampleBehaviorName
+		and: [ (self exampleBehaviorName sameContentAs: anotherExampleSnippet exampleBehaviorName)
 			and: [ self exampleSelector = anotherExampleSnippet exampleSelector
 				and: [ self noCode = anotherExampleSnippet noCode
 					and: [ self previewExpanded = anotherExampleSnippet previewExpanded
 						and: [ self previewHeight = anotherExampleSnippet previewHeight
-							and: [ self previewShowSelector = anotherExampleSnippet previewShowSelector ] ] ] ] ] ]
+							and: [ self previewShowSelector = anotherExampleSnippet previewShowSelector
+								and: [ self previewSelectSelector = anotherExampleSnippet previewSelectSelector ]  ] ] ] ] ] ]
+]
+
+{ #category : #converting }
+LeExampleSnippet >> snippetSourceFrom: anAST [
+	| ast |
+	ast := self updateInstanceVariableReferencesIn: anAST.
+	ast := self updateSelfReferencesIn: ast.
+	ast temporaryNames do: [ :each | ast removeTemporaryNamed: each ].
+	(ast statements notEmpty and: [ ast statements last isReturn ]) 
+		ifTrue: [ 
+			ast
+				replaceNode: ast statements last
+				withNode: ast statements last value ].
+	^ ast formattedCode
+]
+
+{ #category : #printing }
+LeExampleSnippet >> storeOn: aStream [
+
+	"code adapted from #asAnnotationString method"
+
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new  exampleBehaviorName: '.
+	self exampleBehaviorName storeOn: aStream.
+	aStream nextPutAll: '; exampleSelector: '.
+	self exampleSelector storeOn: aStream.
+
+
+	self noCode = self defaultNoCode ifFalse: [ 
+		aStream nextPutAll: '; noCode: '.
+		self noCode storeOn: aStream ].
+
+	self codeExpanded = self defaultCodeExpanded ifFalse: [ 
+		aStream nextPutAll: '; codeExpanded: '.
+		self codeExpanded storeOn: aStream ].
+
+	self previewExpanded = self defaultPreviewExpanded ifFalse: [ 
+		aStream nextPutAll: '; previewExpanded: '.
+		self previewExpanded storeOn: aStream ].
+
+	self previewShowSelector = self defaultPreviewShowSelector ifFalse: [ 
+		aStream nextPutAll: '; previewShowSelector: '.
+		self previewShowSelector storeOn: aStream ].
+		
+	self previewSelectSelector ifNotNil: [ 
+		aStream nextPutAll: '; previewSelectSelector: '.
+		self previewSelectSelector storeOn: aStream ].
+
+	self previewHeight = self defaultPreviewHeight ifFalse: [ 
+		aStream nextPutAll: '; previewHeight: '.
+		self previewHeight storeOn: aStream ].
+
+	aStream nextPutAll: ')'
+]
+
+{ #category : #'private - subscriptions' }
+LeExampleSnippet >> subscribeToSystem [
+	self unsubscribeFromSystem.
+	SystemAnnouncer uniqueInstance weak
+		when: ClassAnnouncement
+			send: #handleSystemClassAnnouncement:
+			to: self;
+		when: MethodAnnouncement
+			send: #handleSystemMethodAnnouncement:
+			to: self
 ]
 
 { #category : #'api - code expanded' }
@@ -719,4 +1008,52 @@ LeExampleSnippet >> unsetPreviewShowSelector [
 	previewShowSelector := nil.
 	self onPreviousPreviewShowSelectorUnset: aPreviousPreviewShowSelector.
 	self notifyPreviewShowSelectorChanged
+]
+
+{ #category : #'private - subscriptions' }
+LeExampleSnippet >> unsubscribeFromSystem [
+	SystemAnnouncer uniqueInstance unsubscribe: self
+]
+
+{ #category : #converting }
+LeExampleSnippet >> updateInstanceVariableReferencesIn: anAST [
+	| rewrites |
+	rewrites := RBParseTreeRewriter new.
+	self exampleClass allInstVarNames
+		do:
+			[ :each | 
+			rewrites
+				replace: each , ' := ``@a' with: 'self instVarNamed: ''' , each , ''' put: ``@a';
+				replace: each with: 'self instVarNamed: ''' , each , '''' ].
+	rewrites executeTree: anAST.
+	^ rewrites tree
+]
+
+{ #category : #converting }
+LeExampleSnippet >> updateSelfReferencesIn: anAST [
+	| selfNodes newNode |
+	selfNodes := OrderedCollection new.
+	anAST nodesDo: [ :each | (each isVariable and: [ each name = #self ]) ifTrue: [ selfNodes add: each ] ].
+	selfNodes isEmpty ifTrue: [ ^ anAST ].
+	self isForMetaclass
+		ifTrue: [ newNode := RBVariableNode named: self instanceClassName ]
+		ifFalse:
+			[ selfNodes size > 1
+				ifTrue:
+					[ | name index |
+					name := 'instance'.
+					index := 1.
+					[ anAST allTemporaryVariables anySatisfy: [ :each | each asString = name ] ]
+						whileTrue:
+							[ name := 'instance' , index printString.
+							index := index + 1 ].
+					anAST
+						addNodeFirst:
+							(RBAssignmentNode
+								variable: (RBVariableNode named: name)
+								value: (RBMessageNode receiver: (RBVariableNode named: self instanceClassName) selector: #new)).
+					newNode := RBVariableNode named: name ]
+				ifFalse: [ newNode := RBMessageNode receiver: (RBVariableNode named: self instanceClassName) selector: #new ] ].
+	selfNodes do: [ :each | each replaceWith: newNode copy ].
+	^ anAST
 ]

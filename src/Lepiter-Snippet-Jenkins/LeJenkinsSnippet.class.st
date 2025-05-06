@@ -12,7 +12,12 @@ LeJenkinsSnippet class >> contextMenuItemSpecification [
 	<leSnippetSpecification>
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'Jenkins'
+		title: self description
+]
+
+{ #category : #'api - accessing menu' }
+LeJenkinsSnippet class >> description [
+	^ 'Jenkins'
 ]
 
 { #category : #accessing }
@@ -50,6 +55,11 @@ LeJenkinsSnippet >> asSnippetViewModel [
 	^ LeJenkinsSnippetViewModel new jenkinsSnippetModel: self
 ]
 
+{ #category : #testing }
+LeJenkinsSnippet >> canMoveToAnotherDatabase [
+	^ true
+]
+
 { #category : #accessing }
 LeJenkinsSnippet >> contentAsString [
 	<return: #String>
@@ -66,4 +76,14 @@ LeJenkinsSnippet >> jenkinsUrl [
 { #category : #accessing }
 LeJenkinsSnippet >> jenkinsUrl: aJenkinsUrl [
 	jenkinsUrl := aJenkinsUrl
+]
+
+{ #category : #printing }
+LeJenkinsSnippet >> storeOn: aStream [
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new jenkinsUrl:'.
+	self jenkinsUrl storeOn: aStream.
+	aStream nextPutAll: '; yourself)'
 ]

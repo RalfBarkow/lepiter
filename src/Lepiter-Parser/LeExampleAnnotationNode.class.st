@@ -59,6 +59,15 @@ LeExampleAnnotationNode >> previewHeight [
 ]
 
 { #category : #accessing }
+LeExampleAnnotationNode >> previewSelectSelector [
+	items
+		do: [ :each | 
+			each isPreviewSelect
+				ifTrue: [ ^ each selectorValue ] ].
+	^ nil
+]
+
+{ #category : #accessing }
 LeExampleAnnotationNode >> previewShowSelector [
 	items
 		do: [ :each | 

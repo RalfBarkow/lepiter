@@ -21,7 +21,14 @@ LeJsonV4Reader >> for: smalltalkClass do: block [
 LeJsonV4Reader >> initialize [
 
 	super initialize.
-	typeMap := Dictionary new.
+	typeMap := GtStringContentDictionary new.
+]
+
+{ #category : #accessing }
+LeJsonV4Reader >> mapClass [
+	"Return the collection type to use for JSON maps"
+	
+	^ mapClass ifNil: [ GtStringContentDictionary ]
 ]
 
 { #category : #accessing }
@@ -52,9 +59,11 @@ LeJsonV4Reader >> object: type from: map [
 
 { #category : #private }
 LeJsonV4Reader >> objectFor: anObject [
-	"Answer the single instance of anObject."
+	"Minimise memory usage by making Strings and ByteArrays singular."
 
-	^ objects at: anObject ifAbsentPut: [ anObject ]
+	^ (anObject isString or: [ anObject class = ByteArray ])
+		ifTrue: [ objects at: anObject ifAbsentPut: [ anObject ] ]
+		ifFalse: [ anObject ].
 ]
 
 { #category : #'initialize-release' }
@@ -70,7 +79,7 @@ LeJsonV4Reader >> parseMap [
 
 	map := super parseMap.
 	^ map 
-		at: #'__type'
+		at: '__type'
 		ifPresent: [ :type | self object: type from: map ]
 		ifAbsent: [ map ]
 ]
@@ -81,21 +90,37 @@ LeJsonV4Reader >> parseValue [
 	^ self objectFor: super parseValue
 ]
 
+{ #category : #copying }
+LeJsonV4Reader >> postCopy [
+	super postCopy.
+	readStream := nil.
+	stringStream := nil.
+	listClass := nil.
+	mapClass := nil.
+	objects := nil
+]
+
 { #category : #private }
 LeJsonV4Reader >> unknownSnippetTypeFrom: map [
 	"If the supplied map looks like a snippet, answer an unknown snippet, otherwise raise an exception"
+
 	| children snippet |
-
 	"map is considered a snippet if it has all the keys of LeBlock"
-	((LeSnippet leJsonV4AttributeMapping collect: #key as: Set) difference: map keys) ifNotEmpty: 
-		[ self error: 'Unknown snippet type' ].
+	((LeSnippet leJsonV4AttributeMapping collect: #key as: GtStringContentSet)
+		difference: map keys) ifNotEmpty: [ self error: 'Unknown snippet type' ].
 
-	children := map at: #children.
-	map at: #children put: LeSnippets new.
-	snippet := LeUnknownSnippet jsonString: (String streamContents: [ :stream | 
-				LeJsonV4 uniqueInstance serialize: map on: stream prettyPrint: true ]).
-	snippet 
+	children := map at: 'children'.
+	map at: 'children' put: LeSnippets new.
+	snippet := LeUnknownSnippet
+			jsonString: (String
+					streamContents: [ :stream | 
+						LeJsonV4 uniqueInstance
+							serialize: map
+							on: stream
+							prettyPrint: true ]).
+	snippet
 		children: children;
-		uid: (map at: #uid).
+		uid: (map at: 'uid'). 
+	map at: 'editTime' ifPresent: [ :editTime | snippet editTime: editTime ].
 	^ snippet
 ]

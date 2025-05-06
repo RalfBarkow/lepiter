@@ -26,5 +26,5 @@ LeChangesAnnotationNode >> expandedDefault [
 
 { #category : #accessing }
 LeChangesAnnotationNode >> filename [
-	^ self nameNode ifNotNil: [ :node | node stringValue ]
+	^ self nameNode ifNotNil: [ :node | node value value ]
 ]

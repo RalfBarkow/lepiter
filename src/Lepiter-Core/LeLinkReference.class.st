@@ -137,6 +137,11 @@ LeLinkReference >> resolveAndLinkReference [
 LeLinkReference >> resolveReference [
 ]
 
+{ #category : #accessing }
+LeLinkReference >> status [
+	^ LeLinkReferenceStatus indecisive
+]
+
 { #category : #actions }
 LeLinkReference >> unlink [
 ]

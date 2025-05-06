@@ -11,6 +11,28 @@ Class {
 }
 
 { #category : #accessing }
+LeCompletionStrategy >> addPageLinkCompletionsFor: aText at: positionInteger to: stream [
+	| char index |
+
+	index := positionInteger.
+	[ index > 0 ]
+		whileTrue:
+			[ char := aText at: index.
+			(char isLineBreak or: [ char = $] ]) ifTrue: [ ^ stream ].
+			char = $[
+				ifTrue:
+					[ ^ stream
+						merge:
+							(self
+								bracketCompletionActionStreamFor: aText
+								at: positionInteger
+								withPrefix: (aText copyFrom: index + 1 to: positionInteger) asString
+								needsAdditionalBracket: (index = 1 or: [ (aText at: index - 1) ~= $[ ])) ].
+			index := index - 1 ].
+	^ stream
+]
+
+{ #category : #accessing }
 LeCompletionStrategy >> allClasses [
 	^ allClasses
 		ifNil: [ allClasses := GtPrefixTree
@@ -18,107 +40,60 @@ LeCompletionStrategy >> allClasses [
 ]
 
 { #category : #accessing }
-LeCompletionStrategy >> astCompletionActionsFor: aText at: positionInteger max: maxInteger requested: aBoolean [
-	| ast visitor items |
-	items := OrderedCollection new.
-	ast := LeParser parseWithErrors: aText.
+LeCompletionStrategy >> astCompletionResultFor: aText at: positionInteger onStream: streamBlock [
+	| ast visitor |
+	ast := LeParser parseWithErrors: aText asString.
 	visitor := LeContentCompletionVisitor new.
 	visitor strategy: self.
 	visitor text: aText.
 	visitor position: positionInteger.
-	visitor
-		actionBlock: [ :item | 
-			items add: item.
-			items size >= maxInteger
-				ifTrue: [ ^ items ] ].
 	visitor accept: ast.
-	^ items
+	^ visitor hasCompletionResult
+		ifTrue: [ visitor completionResult ]
+		ifFalse: [ GtStreamedCompletionResult onStream: (streamBlock value: visitor stream) ]
 ]
 
 { #category : #accessing }
-LeCompletionStrategy >> bracketCompletionActionsFor: aText at: positionInteger max: maxInteger withPrefix: prefix needsAdditionalBracket: aBoolean [
-	| rightBracketCount index char rightBracketIndex leftBracket |
+LeCompletionStrategy >> bracketCompletionActionStreamFor: aText at: positionInteger withPrefix: prefix needsAdditionalBracket: aBoolean [
+	"Answer a stream of completion actions for the supplied text.
+	positionInteger is the current cursor index.
+	prefix is the portion of the text to be completed.
+	aBoolean indicates whether an additional opening bracket needs to be supplied."
+	| rightBracketCount index char rightBracketIndex leftBracketOffset start end result |
 	index := positionInteger + 1.
 	rightBracketCount := 0.
-	[ rightBracketCount = 0
-		and: [ index <= aText size
-				and: [ (char := aText at: index) isLineBreak not ] ] ]
-		whileTrue: [ char = $]
-				ifTrue: [ rightBracketIndex := index.
-					rightBracketCount := (index + 1 < aText size
-						and: [ (aText at: index + 1) = $] ])
-						ifTrue: [ 2 ]
-						ifFalse: [ 1 ] ].
+	[ rightBracketCount = 0 and: [ index <= aText size and: [ (char := aText at: index) isLineBreak not ] ] ]
+		whileTrue:
+			[ char = $] 	ifTrue:
+				[ rightBracketIndex := index.
+				rightBracketCount := (index + 1 < aText size and: [ (aText at: index + 1) = $] ]) ifTrue: [ 2 ] ifFalse: [ 1 ] ].
 			index := index + 1 ].
-	leftBracket := (aBoolean and: [ prefix isEmpty ])
-		ifTrue: [ '[' ]
-		ifFalse: [ '' ].
-	^ (self pageTitles first: maxInteger startingWith: prefix)
-		collect: [ :each | 
-			| action rightBrackets |
-			action := rightBracketCount > 0
-				ifTrue: [ rightBrackets := rightBracketCount = 1
-						ifTrue: [ ']' ]
-						ifFalse: [ '' ].
-					(GtCompositeCompletionAction labeled: each)
-						addAction:
-							(GtDeleteTextCompletionAction
-								labeled: ''
-								from: positionInteger + 1
-								to: rightBracketIndex - 1);
-						addAction:
-							(GtInsertTextCompletionAction
-								labeled: each
-								completion: leftBracket , (each allButFirst: prefix size) , rightBrackets
-								position: positionInteger
-								from: positionInteger - prefix size) ]
-				ifFalse: [ GtInsertTextCompletionAction
-						labeled: each
-						completion: leftBracket , (each allButFirst: prefix size) , ']]'
-						position: positionInteger
-						from: positionInteger - prefix size ].
-			(aBoolean and: [ prefix notEmpty ])
-				ifTrue: [ (action isKindOf: GtCompositeCompletionAction)
-						ifFalse: [ action := (GtCompositeCompletionAction labeled: each)
-								addAction: action ].
-					action
-						addAction:
-							(GtInsertTextCompletionAction
-								labeled: '['
-								completion: '['
-								position: positionInteger - prefix size
-								from: positionInteger - prefix size);
-						yourself ].
-			action ]
+	end := positionInteger + rightBracketCount.
+	leftBracketOffset := (aBoolean and: [ prefix isEmpty ]) ifTrue: [ 1 ] ifFalse: [ 2 ].
+	start := (positionInteger - prefix size - leftBracketOffset) max: 0.
+	result:= (self pageTitles asyncStreamStartingWith: prefix) collect:
+		[ :each | | action |
+		action := LeReplaceSubtextCompletionAction new
+			database: database;
+			label: (self labelFor: each withSearch: prefix);
+			pageName: each;
+			start: start;
+			end: end.
+		action ].
+	^ result.
 ]
 
-{ #category : #accessing }
-LeCompletionStrategy >> completionActionsFor: aText at: positionInteger max: maxInteger requested: aBoolean [
-	| seenWhitespace char index actions |
-	actions := self
-		astCompletionActionsFor: aText
+{ #category : #completing }
+LeCompletionStrategy >> completionResultFor: aText at: positionInteger requested: aBoolean [
+	^ self
+		astCompletionResultFor: aText
 		at: positionInteger
-		max: maxInteger
-		requested: aBoolean.
-	actions notEmpty
-		ifTrue: [ ^ actions ].
-	seenWhitespace := false.
-	index := positionInteger.
-	[ index > 0 ]
-		whileTrue: [ char := aText at: index.
-			(char isLineBreak or: [ char = $] ])
-				ifTrue: [ ^ #() ].
-			char isSeparator
-				ifTrue: [ seenWhitespace := true ].
-			char = $[
-				ifTrue: [ ^ self
-						bracketCompletionActionsFor: aText
-						at: positionInteger
-						max: maxInteger
-						withPrefix: (aText copyFrom: index + 1 to: positionInteger) asString
-						needsAdditionalBracket: (index = 1 or: [ (aText at: index - 1) ~= $[ ]) ].
-			index := index - 1 ].
-	^ #()
+		onStream:
+			[ :stream | 
+			self
+				addPageLinkCompletionsFor: aText
+				at: positionInteger
+				to: stream ]
 ]
 
 { #category : #accessing }

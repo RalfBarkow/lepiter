@@ -37,20 +37,11 @@ LePharoClassDatabase >> onClassCommentChanged: aClassCommentedAnnouncement [
 	snippet updateString: newComment.
 ]
 
-{ #category : #'api - accessing' }
-LePharoClassDatabase >> pageNamed: aSymbol [
-
-	^ pagesByName at: aSymbol ifAbsentPut:
-		[ (LePage pharoCommentClassName: aSymbol)
-			addSnippet: (LeTextSnippet string: (self class environment at: aSymbol) instanceSide organization classComment);
-			yourself ]
-]
-
 { #category : #private }
 LePharoClassDatabase >> registerForClassCommentAnnouncements [
 	"Register for class comment announcements so we can manage the cache"
 
-	SystemAnnouncer uniqueInstance
+	SystemAnnouncer uniqueInstance weak
 		when: ClassCommented
 		send: #onClassCommentChanged:
 		to: self.

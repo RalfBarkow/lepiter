@@ -11,29 +11,28 @@ Class {
 	#instVars : [
 		'pageElement',
 		'toolbarElement',
-		'titleElement'
+		'titleElement',
+		'frame'
 	],
 	#category : #'Lepiter-UI-Support - Page Toolbar'
 }
 
 { #category : #'api - building' }
 LePageHeaderBuilder >> addExtensionButtons [
-	^ (Pragma
-		allNamed: #leHeaderAction
-		from: self class
-		to: ProtoObject)
-			do: [ :eachPragma | 
-				self perform: eachPragma methodSelector ]. 
+	^ self pageElement hasPage
+		ifTrue: [ (GtPhlowActionsCollector new
+				pragmaName: #lePageAction;
+				fromObject: self page;
+				collect)
+				do: [ :each | 
+					each
+						asElement: [ :actionElement | self toolbarElement addItem: actionElement ]
+						withHostElement: self ] ]
 ]
 
 { #category : #'private - building' }
 LePageHeaderBuilder >> addFixedSeparator [
 	self toolbarElement addFixedSeparator
-]
-
-{ #category : #'private - building' }
-LePageHeaderBuilder >> addFlexibleSeparator [
-	self toolbarElement addFlexibleSeparator
 ]
 
 { #category : #'private - building' }
@@ -49,60 +48,13 @@ LePageHeaderBuilder >> addInspectButton [
 ]
 
 { #category : #'private - building' }
-LePageHeaderBuilder >> addRemoteLinkToClipboardButton [
-	"Add a button the copies the markdown to reference the receiver as a remote page"
-	| newButton |
-
-	newButton := BrButton new 
-		aptitude: BrGlamorousButtonWithIconAptitude;
-		label: 'Copy as Remote Reference to the clipboard';
-		icon: BrGlamorousVectorIcons clipboard;
-		action: [ :aButton | Clipboard clipboardText: self page asRemoteLink ].
-	self toolbarElement addItem: newButton.
-]
-
-{ #category : #'private - building' }
-LePageHeaderBuilder >> addRemovePageButton [
-	| aButton |
-	aButton := BrButton new.
-	aButton
-		aptitude: BrGlamorousButtonWithIconAptitude
-			+ (BrGlamorousWithDropdownAptitude
-					handle: [ BrButton new
-						icon: BrGlamorousIcons empty;
-						aptitude: BrGlamorousButtonRectangularAptitude + BrGlamorousButtonIconAptitude ]
-					content: (LePageRemoveDropdownContentStencil new
-						pageElement: self pageElement;
-						anchor: aButton));
-		label: 'Remove Page';
-		icon: BrGlamorousVectorIcons remove.
-	self toolbarElement addItem: aButton.
-]
-
-{ #category : #'private - building' }
-LePageHeaderBuilder >> addTableOfContentsToggle [
-	| aToggle |
-	aToggle := BrToggle new.
-	aToggle
-		aptitude: BrGlamorousToggleWithIconAptitude;
-		label: 'Promote page as Table of Contents';
-		icon: BrGlamorousIcons tree;
-		addEventHandler: (LeTableOfContentsToggleEventHandler new 
-			pageElement: self pageElement);
-		addAptitude: (BrToggleAptitude new
-			activated: [ :aState | aState do: [ :aWidget | 
-				aWidget label: 'Withdraw page as Table of Contents' ] ];
-			deactivated: [ :aState | aState do: [ :aWidget | 
-				aWidget label: 'Promote page as Table of Contents' ] ]).
-	
-	"self toolbarElement addItem: (BrToggleGroup new
-		aptitude: BrGlamorousToggleGroupAptitude new;
-		addToggle: aToggle)"
-]
-
-{ #category : #'private - building' }
 LePageHeaderBuilder >> addTitle [
-	self toolbarElement addItem: self titleElement.
+	self frame addChild: self titleElement.
+]
+
+{ #category : #'api - building' }
+LePageHeaderBuilder >> addToolbarToFrame [
+	self frame addChild: self toolbarElement
 ]
 
 { #category : #'api - building' }
@@ -115,6 +67,16 @@ LePageHeaderBuilder >> build [
 LePageHeaderBuilder >> database [
 	<return: #LeDatabase>
 	^ self pageElement database
+]
+
+{ #category : #accessing }
+LePageHeaderBuilder >> frame [
+	^ frame
+]
+
+{ #category : #accessing }
+LePageHeaderBuilder >> frame: anObject [
+	frame := anObject
 ]
 
 { #category : #'api - accessing' }
@@ -136,7 +98,8 @@ LePageHeaderBuilder >> pageElement: anObject [
 
 { #category : #'private - building' }
 LePageHeaderBuilder >> removeAllItems [
-	self toolbarElement removeAllItems
+	self toolbarElement removeAllItems.
+	self frame removeChildren
 ]
 
 { #category : #'api - accessing' }
@@ -153,6 +116,7 @@ LePageHeaderBuilder >> titleElement: anObject [
 LePageHeaderBuilder >> toolbarElement [
 	<return: #LeToolbarElement>
 	^ toolbarElement
+		ifNil: [ toolbarElement := LeToolbarElement new hFitContent padding: (BlInsets top: 10) ]
 ]
 
 { #category : #'api - accessing' }

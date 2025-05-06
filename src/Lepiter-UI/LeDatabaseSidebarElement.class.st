@@ -17,25 +17,11 @@ Class {
 		'selection',
 		'tableOfContentsElement',
 		'tableOfContentsTab',
-		'dailyNotesGroupElement'
+		'dailyNotesGroupElement',
+		'navigationModel'
 	],
 	#category : #'Lepiter-UI-! UI - Database'
 }
-
-{ #category : #'private - updating' }
-LeDatabaseSidebarElement >> addTableOfContentsTab [
-
-	self tableOfContentsTab ifNil: [ 
-		tableOfContentsElement := nil.
-		tableOfContentsTab := BrTab new
-			aptitude: BrGlamorousTabAptitude new;
-			select;
-			label: 'ToC';
-			stencil: [ self tableOfContentsElement ] ].
-	
-	(tabGroupElement hasTab: self tableOfContentsTab) ifFalse: [ 	
-		tabGroupElement addTab: self tableOfContentsTab at: 1 ].
-]
 
 { #category : #'private - visibility' }
 LeDatabaseSidebarElement >> beExact: aNumber [
@@ -78,12 +64,6 @@ LeDatabaseSidebarElement >> expand [
 	widthStrategy adjustWidthFor: self.
 ]
 
-{ #category : #'private - testing' }
-LeDatabaseSidebarElement >> hasTableOfContents [
-	<return: #Boolean>
-	^ self database tableOfContents isNotNil.
-]
-
 { #category : #'private - visibility' }
 LeDatabaseSidebarElement >> hide [
 	self visibility: BlVisibility gone
@@ -94,10 +74,10 @@ LeDatabaseSidebarElement >> initialize [
 	super initialize.
 	selection := self defaultSelection.
 	widthStrategy := BrResizerElementLength weight: 0.5.
+	self initializeNavigationModel.
 	self initializeTabGroupElement.
 	self initializeElement.
 
-	self addChild: self tabGroupElement as: #content.
 	self
 		addAptitude: (BrGlamorousWithHorizontalResizerAptitude new 
 		resizerDo: [ :theResizer | resizerElement := theResizer ]).
@@ -106,8 +86,8 @@ LeDatabaseSidebarElement >> initialize [
 	self expand.
 		
 	self addAptitude: (GtPhlowToolDetailAptitude new
-		normal: [ self onNormalVolume ];
-		detailed: [ self onDetailedVolume ]).
+		normal: [ :aStyle | aStyle do: [ self onNormalVolume ] ];
+		detailed: [ :aStyle | aStyle do: [ self onDetailedVolume ] ]).
 	self addAptitude: (BrLayoutResizerAptitude new
 		vInherit;
 		vInherit: self tabGroupElement)
@@ -135,19 +115,21 @@ LeDatabaseSidebarElement >> initializeListeners [
 ]
 
 { #category : #initialization }
+LeDatabaseSidebarElement >> initializeNavigationModel [
+	navigationModel := LeDatabaseNavigationModel new.
+	navigationModel weak when: LeUIPageSelected send: #onPageSelection: to: self
+]
+
+{ #category : #initialization }
 LeDatabaseSidebarElement >> initializeTabGroupElement [
-	tabGroupElement := BrTabGroup new
-		aptitude: BrGlamorousTabGroupAptitude;
-		addTab: (BrTab new
-			aptitude: BrGlamorousTabAptitude new;
-			label: 'Pages';
-			stencil: [ self pagesElement ]);
-		addTab: (BrTab new
-			aptitude: BrGlamorousTabAptitude new;
-			label: 'By Day';
-			stencil: [ self dailyNotesGroupElement ]).
+	tabGroupElement := GtPhlowCompositeView new
+			views: (GtPhlowViewsCollector new
+					fromObject: navigationModel;
+					pragmaName: #leDatabaseView;
+					collect);
+			asElementDo: [ :aTabGroup | aTabGroup padding: aTabGroup padding + (BlInsets right: 3) ].
 			
-	tabGroupElement padding: tabGroupElement padding + (BlInsets right: 3).
+	tabGroupElement id: #content.
 ]
 
 { #category : #'private - testing' }
@@ -156,17 +138,21 @@ LeDatabaseSidebarElement >> isCollapsed [
 	^ self width <= self resizerElement width
 ]
 
+{ #category : #accessing }
+LeDatabaseSidebarElement >> navigationModel [
+	^ navigationModel
+]
+
+{ #category : #accessing }
+LeDatabaseSidebarElement >> navigationModel: anObject [
+	navigationModel := anObject
+]
+
 { #category : #'private - instance creation' }
 LeDatabaseSidebarElement >> newDailyNotesElement [
 	| newDailyNotesElement |
 
-	newDailyNotesElement := LeDatabasePageListElement new.
-		
-	self hasDatabase
-		ifTrue: [
-			newDailyNotesElement
-				databaseViewModel: self databaseViewModel;
-				showDailyNotes ].
+	newDailyNotesElement := LeDatabaseSidebarTreeElement new navigationModel: self navigationModel.
 	
 	^ newDailyNotesElement
 ]
@@ -174,40 +160,27 @@ LeDatabaseSidebarElement >> newDailyNotesElement [
 { #category : #'private - instance creation' }
 LeDatabaseSidebarElement >> newDailyNotesGroupElement [
 	| newDailyNotesElement |
+	newDailyNotesElement := LeDatabaseSidebarTreeElement new
+			navigationModel: self navigationModel;
+			selectionBlock: [ :aNavigationModel | 
+				aNavigationModel database dailyNotesGroup
+					collect: [ :aDailyNote | LeDailyNoteTreeNodeModel forDailyNote: aDailyNote ] ].
 
-	newDailyNotesElement := LeDatabaseDailyNotesTreeElement new.
-		
-	self hasDatabase
-		ifTrue: [
-			newDailyNotesElement
-				databaseViewModel: self databaseViewModel;
-				selection: self selection ].
-	
 	^ newDailyNotesElement
 ]
 
 { #category : #'private - instance creation' }
 LeDatabaseSidebarElement >> newPagesElement [
 	| newPagesElement |
-	
-	newPagesElement := LeDatabasePageListElement new.
-	self hasDatabase ifTrue: [
-		newPagesElement database: self database.
-		newPagesElement selection: self selection ].
-	
+	newPagesElement := LeDatabaseSidebarTreeElement new
+			navigationModel: self navigationModel;
+			selectionBlock: [ :aNavigationModel | 
+				aNavigationModel hasDatabase
+					ifTrue: [ aNavigationModel database pagesByDateToShow
+							collect: [ :aPage | LePageTreeNodeModel forPage: aPage ] ]
+					ifFalse: [ {} ] ].
+
 	^ newPagesElement
-]
-
-{ #category : #'private - instance creation' }
-LeDatabaseSidebarElement >> newTableOfContentsElement [
-	| newTableOfContentsElement |
-
-	newTableOfContentsElement := LeDatabaseTableOfContentsTreeElement new.
-	
-	self hasDatabase
-		ifTrue: [ newTableOfContentsElement databaseViewModel: self databaseViewModel ].
-
-	^ newTableOfContentsElement
 ]
 
 { #category : #'private - hooks' }
@@ -219,12 +192,22 @@ LeDatabaseSidebarElement >> onContentUIModelChanged [
 
 { #category : #'private - event handling' }
 LeDatabaseSidebarElement >> onDetailedVolume [
-	self show
+	self show.
+	
+	tabGroupElement hasParent
+		ifFalse: [ self addChildFirst: tabGroupElement ]
 ]
 
 { #category : #'private - event handling' }
 LeDatabaseSidebarElement >> onNormalVolume [
-	self hide
+	self hide.
+	tabGroupElement removeFromParent.
+]
+
+{ #category : #initialization }
+LeDatabaseSidebarElement >> onPageSelection: anAnnouncement [
+	self
+		fireEvent: (LeDatabaseSidebarChangePageWish new pageUIModel: anAnnouncement page)
 ]
 
 { #category : #'private - event handling' }
@@ -242,13 +225,6 @@ LeDatabaseSidebarElement >> onResizerResized: anEvent [
 
 { #category : #'private - hooks' }
 LeDatabaseSidebarElement >> onSelectionChanged [
-	self updateSelection.
-]
-
-{ #category : #'private - announcement handling' }
-LeDatabaseSidebarElement >> onTableOfContentsUUIDChanged: anAnnouncement [
-	self enqueueTask: (BlTaskAction new action: [
-		self updateTableOfContentTab ]).
 ]
 
 { #category : #'private - accessing' }
@@ -259,15 +235,6 @@ LeDatabaseSidebarElement >> pagesElement [
 { #category : #'private - accessing' }
 LeDatabaseSidebarElement >> pagesElementDo: aBlock [
 	pagesElement ifNotNil: aBlock
-]
-
-{ #category : #'private - updating' }
-LeDatabaseSidebarElement >> removeTableOfContentsTab [
-	self tableOfContentsTab ifNil: [ ^ self ].
-	(tabGroupElement hasTab: self tableOfContentsTab)
-		ifTrue: [ tabGroupElement removeTab: self tableOfContentsTab ].
-	tableOfContentsElement := nil.
-	tableOfContentsTab := nil.
 ]
 
 { #category : #'private - accessing' }
@@ -289,6 +256,7 @@ LeDatabaseSidebarElement >> selection: aLePageUIModel [
 	selection = aLePageUIModel
 		ifTrue: [ ^ self ].
 	selection := aLePageUIModel.
+	navigationModel page: aLePageUIModel.
 	self onSelectionChanged
 ]
 
@@ -297,34 +265,9 @@ LeDatabaseSidebarElement >> show [
 	self visibility: BlVisibility visible
 ]
 
-{ #category : #'private - subscriptions' }
-LeDatabaseSidebarElement >> subscribeToContent [
-	super subscribeToContent.
-	self database weak
-		when: LeDatabaseTableOfContentsUUIDChanged
-		send: #onTableOfContentsUUIDChanged:
-		to: self.
-]
-
 { #category : #'private - accessing' }
 LeDatabaseSidebarElement >> tabGroupElement [
 	^ tabGroupElement
-]
-
-{ #category : #'private - accessing' }
-LeDatabaseSidebarElement >> tableOfContentsElement [
-	^ tableOfContentsElement ifNil: [ tableOfContentsElement := self newTableOfContentsElement ].
-]
-
-{ #category : #'private - accessing' }
-LeDatabaseSidebarElement >> tableOfContentsElementDo: aBlock [
-	tableOfContentsElement ifNotNil: aBlock
-]
-
-{ #category : #'private - accessing' }
-LeDatabaseSidebarElement >> tableOfContentsTab [
-	<return: #BrTab>
-	^ tableOfContentsTab
 ]
 
 { #category : #'private - subscriptions' }
@@ -336,11 +279,23 @@ LeDatabaseSidebarElement >> unsubscribeFromContent [
 
 { #category : #'private - updating' }
 LeDatabaseSidebarElement >> updateContent [
-	self updateTableOfContentTab.
-	self tableOfContentsElementDo: [ :anElement | anElement databaseViewModel: self databaseViewModel ].
-	"self dailyNotesElementDo: [ :anElement | anElement databaseViewModel: self databaseViewModel ]."
-	self dailyNotesGroupElementDo: [ :anElement | anElement databaseViewModel: self databaseViewModel ].
-	self pagesElementDo: [ :anElement | anElement databaseViewModel: self databaseViewModel ].
+	self database = navigationModel database ifTrue: [ ^ self ].
+	navigationModel database: self database.
+	self updateTabGroupElement.
+	self tabGroupElement
+		actionbarStencil: [ | anActionBar |
+			anActionBar := BrToolbar new aptitude: BrGlamorousToolbarAptitude new.
+
+			(GtPhlowActionsCollector new
+				pragmaName: #leNavigationAction;
+				fromObject: self navigationModel;
+				collect)
+				do: [ :each | 
+					each
+						asElement: [ :actionElement | anActionBar addItem: actionElement ]
+						withHostElement: self ].
+
+			anActionBar ]
 ]
 
 { #category : #'private - updating' }
@@ -352,8 +307,9 @@ LeDatabaseSidebarElement >> updateSelection [
 ]
 
 { #category : #'private - updating' }
-LeDatabaseSidebarElement >> updateTableOfContentTab [
-	self hasTableOfContents 
-		ifFalse: [ self removeTableOfContentsTab ]
-		ifTrue: [ self addTableOfContentsTab ].
+LeDatabaseSidebarElement >> updateTabGroupElement [
+	self removeChildNamed: #content.
+	tabGroupElement := nil.
+	self initializeTabGroupElement.
+	self addChild: self tabGroupElement as: #content
 ]

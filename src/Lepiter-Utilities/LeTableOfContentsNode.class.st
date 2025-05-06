@@ -9,9 +9,7 @@ While the database currently only supports a single specified ToC, there is noth
 "
 Class {
 	#name : #LeTableOfContentsNode,
-	#superclass : #Object,
-	#traits : 'TLeSpotterChildrenEnumerationSearch',
-	#classTraits : 'TLeSpotterChildrenEnumerationSearch classTrait',
+	#superclass : #LeAbstractTableOfContentsNode,
 	#instVars : [
 		'page',
 		'link',
@@ -19,12 +17,6 @@ Class {
 	],
 	#category : #'Lepiter-Utilities-ToC'
 }
-
-{ #category : #comparing }
-LeTableOfContentsNode >> = anObject [
-	^ self class = anObject class and: [ 
-		self page = anObject page ]
-]
 
 { #category : #adding }
 LeTableOfContentsNode >> addChild: aLeTableOfContentsNode [
@@ -38,38 +30,10 @@ LeTableOfContentsNode >> children [
 	^ children
 ]
 
-{ #category : #ui }
-LeTableOfContentsNode >> gtChildrenFor: aView [
-	<gtView>
-
-	^ aView tree
-		title: 'Children';
-		priority: 50;
-		items: [ children ];
-		children: #children
-]
-
 { #category : #accessing }
-LeTableOfContentsNode >> gtLiveFor: aView [
-	<gtView>
-	self page ifNil: [ ^ aView empty ].
-	^ aView forward
-		title: 'Live';
-		priority: 1;
-		object: [ self page ];
-		view: #gtLiveFor:
-]
-
-{ #category : #'api - testing' }
 LeTableOfContentsNode >> hasChildren [
 	<return: #Boolean>
 	^ self children isNotEmpty
-]
-
-{ #category : #comparing }
-LeTableOfContentsNode >> hash [
-	^ self class hash bitXor: [ 
-		self page hash ]
 ]
 
 { #category : #initialization }
@@ -78,11 +42,6 @@ LeTableOfContentsNode >> initialize [
 	super initialize.
 	"children are an Array of LeTableOfContentsNode"
 	children := #().
-]
-
-{ #category : #testing }
-LeTableOfContentsNode >> isToCNode [
-	^ true
 ]
 
 { #category : #accessing }
@@ -109,27 +68,22 @@ LeTableOfContentsNode >> page: anObject [
 	page := anObject
 ]
 
-{ #category : #printing }
+{ #category : #accessing }
 LeTableOfContentsNode >> printOn: aStream [
 	| pageTitle |
 
 	pageTitle := self page 
 		ifNil: [ '<unknown>' ]
 		ifNotNil: [ :aPage | aPage title ].
-	link
+	"link
 		ifNil: [ super printOn: aStream ]
-		ifNotNil: [ aStream 
+		ifNotNil: [ "aStream 
 			<< 'ToC: ';
-			<< pageTitle ].
+			<< pageTitle "]".
 	aStream
 		space;
 		nextPut: $(;
-		print: children size;
+		print: self children size;
 		nextPutAll: ' links';
 		nextPut: $).
-]
-
-{ #category : #enumerating }
-LeTableOfContentsNode >> selectedPageDo: aBlock [
-	aBlock cull: self page
 ]

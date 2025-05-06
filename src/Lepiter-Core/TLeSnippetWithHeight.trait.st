@@ -1,9 +1,10 @@
 "
-!Snippet with height
+# Snippet with height
 Should be used by vertically resizable snippets whose height should be preserved in a database.
 
-Users of the ${class:TLeSnippetWithHeight}$ must initialize the ==height== with a sensible default value.
+Users of the {{gtClass:TLeSnippetWithHeight}} must initialize the `height` with a sensible default value.
 The height is rounded to the closest integer
+
 "
 Trait {
 	#name : #TLeSnippetWithHeight,

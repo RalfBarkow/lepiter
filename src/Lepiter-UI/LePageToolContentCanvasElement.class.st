@@ -20,7 +20,7 @@ LePageToolContentCanvasElement >> initialize [
 
 	self addChild: self canvasElement as: #canvas.
 	
-	self addAptitude: (BrLayoutResizerAptitude inherit
+	self addAptitude: (BrLayoutResizerAptitude new
 		hInherit: self headerElement;
 		vAnyToFitContent: self headerElement;
 		inherit: self canvasElement)
@@ -45,7 +45,7 @@ LePageToolContentCanvasElement >> onPageViewModelChanged [
 	self canvasElement layout isStopped: false.
 
 	pageSnippetsTreeViewModel := LeSnippetsTreeViewModel new
-		snippetBindings: self pageViewModel snippetBindings;
+		sharedSnippetContext: self pageViewModel sharedSnippetContext;
 		content: self pageViewModel pageModel.
 
 	self canvasElement addChildren: (Array streamContents: [ :aStream |

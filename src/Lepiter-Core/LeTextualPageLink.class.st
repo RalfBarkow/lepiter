@@ -24,6 +24,8 @@ LeTextualPageLink >> linkNameInterval [
 		ifTrue: [ ^ node startPosition + 3 to: node stopPosition - 2 ].
 	(node isKindOf: LeKeywordLinkNode)
 		ifTrue: [ ^ node startPosition to: node stopPosition - 2 ].
+	((node isKindOf: LePageAnnotationNode) and: [node hasPageName])
+		ifTrue: [ ^ node nameNode startPosition to: node nameNode stopPosition ].
 	^ self error: 'Unknown link type'
 ]
 

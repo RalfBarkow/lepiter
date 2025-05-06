@@ -12,7 +12,12 @@ LeDockerSnippet class >> contextMenuItemSpecification [
 	<leSnippetSpecification>
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'Docker'
+		title: self description
+]
+
+{ #category : #accessing }
+LeDockerSnippet class >> description [
+	^ 'Docker'
 ]
 
 { #category : #'instace creation' }
@@ -50,6 +55,11 @@ LeDockerSnippet >> asSnippetViewModel [
 	^ LeDockerSnippetViewModel new snippetModel: self
 ]
 
+{ #category : #testing }
+LeDockerSnippet >> canMoveToAnotherDatabase [
+	^ true
+]
+
 { #category : #'api - accessing' }
 LeDockerSnippet >> contentAsString [
 	<return: #String>
@@ -58,17 +68,26 @@ LeDockerSnippet >> contentAsString [
 				nextPutAll: (self url ifEmpty: [ '<dockerUrl>' ])]
 ]
 
-{ #category : #'api - testing' }
-LeDockerSnippet >> isEmpty [ 
-	^ self url isNil
-]
-
 { #category : #notifications }
 LeDockerSnippet >> notifyUrlChanged [
 	self notifyAnnouncement: (LeDockerSnippetUrlChanged new
 		source: self;
 		snippet: self;
 		url: self url).
+]
+
+{ #category : #printing }
+LeDockerSnippet >> storeOn: aStream [
+
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new url: '.
+	self url storeOn: aStream.
+	self childrenDo: [ :snippet | 
+		aStream nextPutAll: '; addSnippet: '.
+		snippet storeOn: aStream ].
+	aStream nextPutAll: '; yourself)'
 ]
 
 { #category : #accessing }

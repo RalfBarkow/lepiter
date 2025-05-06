@@ -8,3 +8,8 @@ Class {
 LeDbArgumentNode >> acceptVisitor: anAnnotationParseVisitor [
 	^ anAnnotationParseVisitor visitDbArgument: self
 ]
+
+{ #category : #testing }
+LeDbArgumentNode >> isDb [
+	^ true
+]

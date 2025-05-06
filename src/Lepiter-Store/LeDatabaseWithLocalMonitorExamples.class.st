@@ -11,6 +11,7 @@ Class {
 { #category : #'examples - database' }
 LeDatabaseWithLocalMonitorExamples >> databaseWithMonitor [
 	<gtExample>
+	<return: #LeDatabase>
 	^ self databaseWithMonitorForDirectory: self directory
 ]
 
@@ -30,6 +31,7 @@ LeDatabaseWithLocalMonitorExamples >> databaseWithMonitorForDirectory: aDirector
 { #category : #'examples - database' }
 LeDatabaseWithLocalMonitorExamples >> directory [
 	<gtExample>
+	<return: #FileReference>
 	| aDirectory |
 	aDirectory := FileSystem memory workingDirectory / 'db'.
 	aDirectory ensureCreateDirectory.

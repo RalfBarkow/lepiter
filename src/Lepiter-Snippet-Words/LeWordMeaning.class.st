@@ -13,6 +13,14 @@ Class {
 	#category : #'Lepiter-Snippet-Words-Model'
 }
 
+{ #category : #accessing }
+LeWordMeaning >> = anObject [
+
+	^ (anObject isKindOf: LeWordMeaning) and: [ 
+		  anObject partOfSpeech == self partOfSpeech and: [ 
+			  anObject definitions = self definitions ] ]
+]
+
 { #category : #generated }
 LeWordMeaning >> definitions [
 	| definitions |

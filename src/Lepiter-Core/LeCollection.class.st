@@ -89,14 +89,20 @@ LeCollection >> detect: aBlock [
 	^ items detect: aBlock
 ]
 
+{ #category : #enumerating }
+LeCollection >> detect: aBlock ifFound: foundBlock ifNone: exceptionBlock [
+	^ self items detect: aBlock ifFound: foundBlock ifNone: exceptionBlock
+]
+
 { #category : #'api - enumerating' }
 LeCollection >> do: aBlock [
 	self items do: aBlock
 ]
 
-{ #category : #'gt-extensions' }
-LeCollection >> fasterDifferencePreservingOrder: aCollection [
-	^ self items fasterDifferencePreservingOrder: aCollection
+{ #category : #'api - accessing' }
+LeCollection >> fifth [
+
+	^ items fifth
 ]
 
 { #category : #'api - accessing' }
@@ -110,16 +116,25 @@ LeCollection >> flatCollect: aBlock [
 	^ self items flatCollect: aBlock
 ]
 
+{ #category : #'api - accessing' }
+LeCollection >> fourth [
+
+	^ items fourth
+]
+
 { #category : #'gt-extensions' }
-LeCollection >> gtSpotterContainingSubPartsFor: aStep [
+LeCollection >> gtSpotterContainingSubPartsFor: aSearch [
 	<gtSearch>
-	self hasChildren ifNil: [ ^ self ].
-	aStep listProcessor
+	
+	self hasChildren 
+		ifNil: [ ^ aSearch empty ].
+
+	^ aSearch list
 		priority: 23;
 		title: 'Children Tree Content';
 		wantsToDisplayOnEmptyQuery: false;
-		filter: LeSubstringFilter;
 		items: [ self children ]
+		filterBySubstring
 ]
 
 { #category : #'api - testing' }
@@ -131,6 +146,11 @@ LeCollection >> hasChildren [
 { #category : #testing }
 LeCollection >> ifEmpty: aBlock [
 	^ self items ifEmpty: aBlock
+]
+
+{ #category : #testing }
+LeCollection >> includes: anObject [ 
+	^ self items includes: anObject
 ]
 
 { #category : #accessing }
@@ -194,6 +214,11 @@ LeCollection >> removeAllSuchThat: aBlock [
 LeCollection >> second [
 
 	^ items second
+]
+
+{ #category : #'api - enumerating' }
+LeCollection >> select: aBlock [
+	^ self items select: aBlock
 ]
 
 { #category : #'api - accessing' }

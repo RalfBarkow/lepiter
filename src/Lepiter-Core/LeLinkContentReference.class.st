@@ -60,15 +60,21 @@ LeLinkContentReference >> isLeContentReference [
 LeLinkContentReference >> isReferencingContent: aLeContent [
 	"I check if this reference is for the given content. I do not rely on 
 	comparing the identity of the content as the reference could be unresolved."
-	| linkReferenceDatabaseUUID |
+	| linkReferenceDatabaseUUID givenContentDatabaseUUID |
 	self assert: [ aLeContent notNil ].
 	self assert: [ self explicitLink notNil ].
 	self assert: [ self explicitLink database notNil ].
 	
 	linkReferenceDatabaseUUID := self targetDatabaseUUID ifNil: [ 
-		self explicitLink database uuidString ].
+		self explicitLink database monitor 
+			ifNil: [ nil ]
+			ifNotNil: [ :aMonitor | aMonitor uuidString ] ].
 	
-	^ aLeContent database uuidString = linkReferenceDatabaseUUID
+	givenContentDatabaseUUID := aLeContent database monitor 
+		ifNil: [ nil ]
+		ifNotNil: [ :aMonitor | aMonitor uuidString ].
+			
+	^ givenContentDatabaseUUID = linkReferenceDatabaseUUID
 ]
 
 { #category : #testing }
@@ -119,6 +125,13 @@ LeLinkContentReference >> resolveReference [
 		^ self ].
 	self targetDatabaseDo: [ :aTargetDatabase |
 		self resolveInDatabase: aTargetDatabase ]
+]
+
+{ #category : #accessing }
+LeLinkContentReference >> status [
+	^ self isResolved
+		ifTrue: [ LeLinkReferenceStatus exists ]
+		ifFalse: [ LeLinkReferenceStatus notFound ]
 ]
 
 { #category : #accessing }

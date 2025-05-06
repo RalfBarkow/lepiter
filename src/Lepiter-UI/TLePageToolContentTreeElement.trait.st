@@ -2,8 +2,8 @@ Trait {
 	#name : #TLePageToolContentTreeElement,
 	#instVars : [
 		'treeElement',
-		'updateRequester',
-		'snippetsViewModel'
+		'snippetsViewModel',
+		'updater'
 	],
 	#category : #'Lepiter-UI-! Tool - Page'
 }
@@ -77,10 +77,10 @@ TLePageToolContentTreeElement >> createTreeRowFor: aSnippetElement [
 		clipChildren: false;
 		constraintsDo: [ :c |
 			c horizontal matchParent.
-			c vertical fitContent ];
-		addChild: (BrTriangle new
+			c vertical fitContentLimited ];
+		addChild: (BrInlineExpanderElement new
 			beSmallSize;
-			aptitude: BrGlamorousTriangleInCircleAptitude;
+			aptitude: BrGlamorousTriangleInCircleExpanderAptitude;
 			toggleAction: [ :aToggleElement :aToggleModel |
 				aToggleModel model toggle.
 				aSnippetElement snippetViewModel expanded: aToggleModel model isExpanded ]) as: #toggle;
@@ -88,25 +88,22 @@ TLePageToolContentTreeElement >> createTreeRowFor: aSnippetElement [
 ]
 
 { #category : #initialization }
-TLePageToolContentTreeElement >> initializeUpdaterRequester [
-	updateRequester := GtPhlowUpdateRequester new element: self.
-	updateRequester postponedDuration: 0 seconds.
-	updateRequester action: [ self primitiveUpdateSnippetsAndTree ].
-	
+TLePageToolContentTreeElement >> initializeElementUpdater [
+	updater := BrElementUpdater new element: self.
+	updater action: [ self primitiveUpdateSnippetsAndTree ]
 ]
 
 { #category : #'private - event handling' }
 TLePageToolContentTreeElement >> onContentTreeScrollTo [
 	self assertUIProcess.
 	
-	snippetsViewModel takeViewModelToScrollTo
-		ifNotNil: [ :aViewModelToScrollTo | self treeElement scrollToItem: aViewModelToScrollTo ]
+	snippetsViewModel takeViewModelToScrollToIf: [ :aViewModelToScrollTo | self treeElement scrollToItem: aViewModelToScrollTo ]
 ]
 
 { #category : #'private - event handling' }
 TLePageToolContentTreeElement >> onSnippetsChanged: anAnnouncement [
 
-	updateRequester requestUpdate
+	updater requestUpdate
 ]
 
 { #category : #'private - tree element' }
@@ -119,8 +116,8 @@ TLePageToolContentTreeElement >> primitiveUpdateSnippetsAndTree [
 
 	self primitiveUpdateTree.
 
-	self snippetsViewModel takeViewModelToScrollTo
-		ifNotNil: [ :aViewModelToScrollTo | self treeElement scrollToItem: aViewModelToScrollTo ]
+	self snippetsViewModel takeViewModelToScrollToIf: [ :aViewModelToScrollTo |
+		self treeElement scrollToItem: aViewModelToScrollTo ]
 ]
 
 { #category : #'private - tree element' }

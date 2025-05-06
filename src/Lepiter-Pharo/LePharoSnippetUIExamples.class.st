@@ -9,6 +9,7 @@ Class {
 { #category : #'examples - basic' }
 LePharoSnippetUIExamples >> basicDatabase [
 	<gtExample>
+	<return: #LeDatabase>
 	| aDatabase |
 	aDatabase := LeDatabase new.
 	self assert: aDatabase size equals: 0.
@@ -16,17 +17,17 @@ LePharoSnippetUIExamples >> basicDatabase [
 ]
 
 { #category : #examples }
-LePharoSnippetUIExamples >> snippet [ 
+LePharoSnippetUIExamples >> snippet [
 	<gtExample>
-
-	^ LePharoSnippet new code: '42 inspect'.
+	<return: #LePharoSnippet>
+	^ LePharoSnippet new code: '42 inspect'
 ]
 
 { #category : #examples }
 LePharoSnippetUIExamples >> treeNodeElement [
 	<gtExample>
+	<return: #LePharoSnippetElement>
 	| aSnippet aSnippetUIModel aSnippetElement |
-	
 	aSnippet := self snippet.
 	aSnippetUIModel := aSnippet asSnippetViewModel.
 	aSnippetElement := aSnippetUIModel snippetElementClass new.

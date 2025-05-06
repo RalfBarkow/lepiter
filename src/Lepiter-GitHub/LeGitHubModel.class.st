@@ -31,7 +31,7 @@ LeGitHubModel >> gtResponseRawDataFor: aView [
 	<gtView>
 	self hasResponse ifFalse: [ ^ aView empty ].
 	^ aView forward
-		title: 'Response Data';
+		title: 'Response data';
 		priority: 10;
 		object: [ self response ];
 		view: #gtRawDataFor:

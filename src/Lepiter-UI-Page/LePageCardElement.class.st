@@ -1,7 +1,7 @@
 "
 I display a {{gtClass:LePage}} title:
 
-{{gtExample:LeUIExamples>>#pageCardElement|previewExpanded}}
+{{gtExample:LePageCardElementExamples>>#pageCardElement|previewExpanded}}
 
 
 "
@@ -40,7 +40,7 @@ LePageCardElement >> initialize [
 	self containerElement addChild: self previewElement as: #preview.
 	
 	self addChild: self containerElement as: #card.
-	self addAptitude: (BrLayoutResizerAptitude new inherit
+	self addAptitude: (BrLayoutResizerAptitude new
 		inherit: self containerElement;
 		inherit: self previewElement)
 ]
@@ -48,11 +48,12 @@ LePageCardElement >> initialize [
 { #category : #initialization }
 LePageCardElement >> initializeContainerElement [
 	containerElement := BrButton new
-		layout: BlLinearLayout vertical;
-		aptitude: (BrGlamorousButtonExteriorAptitude new + BrGlamorousButtonWithLabelTooltipAptitude new);
-		padding: (BlInsets all: 1);
-		geometry: (BlRoundedRectangleGeometry cornerRadius: 4);
-		action: [ self phlow spawnTool: self pageViewModel asPhlowTool ]
+			layout: BlLinearLayout vertical;
+			aptitude: BrGlamorousButtonExteriorAptitude new
+					+ BrGlamorousButtonWithLabelTooltipAptitude2 new;
+			padding: (BlInsets all: 1);
+			geometry: (BlRoundedRectangleGeometry cornerRadius: 4);
+			action: [ self phlow spawnTool: self pageViewModel asPhlowTool ]
 ]
 
 { #category : #initialization }

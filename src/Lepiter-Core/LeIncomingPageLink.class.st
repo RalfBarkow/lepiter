@@ -5,8 +5,16 @@ Class {
 		'referencedPage',
 		'link'
 	],
-	#category : #'Lepiter-Core-IncomingReferences'
+	#category : 'Lepiter-Core-IncomingReferences'
 }
+
+{ #category : #'api - accessing' }
+LeIncomingPageLink >> editTime [ 
+	"Answer the edit time of the receiver's link"
+	<return: #LeTime>
+
+	^ link editTime
+]
 
 { #category : #testing }
 LeIncomingPageLink >> isFromPage [

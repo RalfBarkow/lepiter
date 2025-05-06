@@ -14,6 +14,21 @@ LeGitHubIssueSummaryModelElement >> bodyElement [
 	^ bodyElement
 ]
 
+{ #category : #'api - actions' }
+LeGitHubIssueSummaryModelElement >> copyIssueIdIntoClipboard [
+]
+
+{ #category : #'gt - extensions' }
+LeGitHubIssueSummaryModelElement >> gtCopyIssueIdentificatorIntoClipboardFor: anAction [
+	<gtAction>
+	^ anAction button
+		tooltip: 'Copy Issue ID Into Clipboard';
+		icon: BrGlamorousVectorIcons clipboard;
+		target: LeSnippetContextMenuActionTarget uniqueInstance;
+		priority: 20;
+		action: [ :aButton :aSnippetElement | self copyIssueIdIntoClipboard ]
+]
+
 { #category : #initialization }
 LeGitHubIssueSummaryModelElement >> initialize [
 	super initialize.
@@ -23,7 +38,7 @@ LeGitHubIssueSummaryModelElement >> initialize [
 	self addChild: self titleElement as: #title.
 	self addChild: self bodyElement as: #body.
 	
-	self addAptitude: (BrLayoutResizerAptitude inherit 
+	self addAptitude: (BrLayoutResizerAptitude new 
 		anyToFitContent: self titleElement;
 		hInherit: self bodyElement;
 		vAnyToFitContent: self bodyElement).
@@ -32,11 +47,14 @@ LeGitHubIssueSummaryModelElement >> initialize [
 { #category : #initialization }
 LeGitHubIssueSummaryModelElement >> initializeBodyElement [
 	bodyElement := BrEditor new
-		beReadOnlyWithSelection;
-		aptitude: BrGlamorousRegularEditorAptitude;
-		styler: LeSnippetStyler new;
-		hMatchParent;
-		vFitContentLimited.
+			beReadOnlyWithSelection;
+			aptitude: BrGlamorousRegularEditorAptitude;
+			hMatchParent;
+			vFitContentLimited
+]
+
+{ #category : #initialization }
+LeGitHubIssueSummaryModelElement >> initializeIssueIdElement [
 ]
 
 { #category : #initialization }
@@ -48,6 +66,13 @@ LeGitHubIssueSummaryModelElement >> initializeTitleElement [
 		fitContent.
 ]
 
+{ #category : #'as yet unclassified' }
+LeGitHubIssueSummaryModelElement >> snippetViewModel: anObject [
+	super snippetViewModel: anObject.
+	bodyElement
+		styler: (LeSnippetStyler new snippetViewModel: self snippetViewModel)
+]
+
 { #category : #'private - accessing' }
 LeGitHubIssueSummaryModelElement >> titleElement [
 	<return: #BrLabel>
@@ -56,6 +81,7 @@ LeGitHubIssueSummaryModelElement >> titleElement [
 
 { #category : #'private - updating' }
 LeGitHubIssueSummaryModelElement >> updateElement [
+	
 	super updateElement.
 	self titleElement text: self model title.
 	self bodyElement text: self model body.

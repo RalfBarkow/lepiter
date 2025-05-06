@@ -6,6 +6,27 @@ Trait {
 	#category : #'Lepiter-UI-Snippet-! Views'
 }
 
+{ #category : #'gt - extensions' }
+TLeWithSnippetViewModel >> gtSnippetModelProperty [
+	<gtInspectorElementOverview>
+	self hasSnippetViewModel ifFalse: [ ^ nil ].
+	self snippetViewModel hasSnippetModel ifFalse: [ ^ nil ].
+
+	^ GtInspectorElementOverviewProperty new
+		label: 'Snippet model';
+		object: [ self snippetViewModel snippetModel ]
+]
+
+{ #category : #'gt - extensions' }
+TLeWithSnippetViewModel >> gtSnippetViewModelProperty [
+	<gtInspectorElementOverview>
+	self hasSnippetViewModel ifFalse: [ ^ nil ].
+
+	^ GtInspectorElementOverviewProperty new
+		label: 'Snippet view model';
+		object: [ self snippetViewModel ]
+]
+
 { #category : #'api - snippet view model' }
 TLeWithSnippetViewModel >> hasSnippetViewModel [
 	"Return a true if snippet view model is assigned to the receiver element, false otherwise"

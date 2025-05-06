@@ -23,6 +23,11 @@ LeJavaScriptSnippetViewModel >> initializeCoderAddOns: aCoderViewModel [
 		addShortcut: (LeSnippetMoveSnippetDownShortcut new combination: (self keyboardShortcut: #MoveSnippetDown))
 ]
 
+{ #category : #'filter view' }
+LeJavaScriptSnippetViewModel >> parserClass [
+	^ JSParser
+]
+
 { #category : #accessing }
 LeJavaScriptSnippetViewModel >> snippetElementClass [
 	^ LeJavaScriptSnippetElement

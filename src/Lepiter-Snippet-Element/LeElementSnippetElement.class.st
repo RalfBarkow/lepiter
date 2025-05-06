@@ -19,7 +19,8 @@ Class {
 		'snippetResizer',
 		'coderResizer',
 		'showCoderToggle',
-		'maximizerLook'
+		'maximizerLook',
+		'coderSlideActionsToolbar'
 	],
 	#category : #'Lepiter-Snippet-Element-Snippet'
 }
@@ -27,7 +28,7 @@ Class {
 { #category : #initialization }
 LeElementSnippetElement >> createCoderContainer [
 	^ BlElement new
-		layout: (BlGridLayout horizontal columnCount: 2);
+		layout: (BlGridLayout horizontal columnCount: 3);
 		padding: (BlInsets all: 5);
 		constraintsDo: [ :c |
 			c horizontal matchParent.
@@ -52,9 +53,20 @@ LeElementSnippetElement >> createCoderElement [
 		hMatchParent
 ]
 
+{ #category : #'private - coder' }
+LeElementSnippetElement >> createCoderSlideActionsToolbar [
+	^ BrToolbar new
+		constraintsDo: [ :c |
+			c frame horizontal alignRight.
+			c frame vertical alignTop ];
+		margin: (BlInsets top: 0 right: 0 bottom: 5 left: 5);
+		aptitude: BrGlamorousToolbarAptitude;
+		addItem: self createRefreshContentButton
+]
+
 { #category : #initialization }
 LeElementSnippetElement >> createCoderToolbar [
-	^ GtCoderActionsElement new
+	^ GtSourceCoderActionsElement new
 		margin: (BlInsets left: 5)
 ]
 
@@ -64,6 +76,21 @@ LeElementSnippetElement >> createElementContainer [
 		hMatchParent;
 		vExact: 100;
 		padding: (BlInsets all: 5)
+]
+
+{ #category : #'private - coder' }
+LeElementSnippetElement >> createRefreshContentButton [
+	^ BrButton new
+		beSmallSize;
+		margin: (BlInsets top: 0 right: 0 bottom: 10 left: 10);
+		padding: (BlInsets all: 10);
+		zIndex: 10;
+		aptitude: BrGlamorousButtonWithIconAptitude + BrGlamorousToggleBackgroundAptitude;
+		icon: BrGlamorousIcons refresh asElement;
+		label: 'Refresh' asString;
+		action: [
+			self generateDisplayElement];
+		yourself
 ]
 
 { #category : #initialization }
@@ -105,6 +132,16 @@ LeElementSnippetElement >> createVerticalResizer [
 ]
 
 { #category : #accessing }
+LeElementSnippetElement >> displayElement [
+	"Get the element that is created by the element snippet code."
+
+	^ elementContainer
+		childWithId: #displayElement
+		ifFound: #yourself
+		ifNone: [ nil ]
+]
+
+{ #category : #accessing }
 LeElementSnippetElement >> editor [ 
 	"Answer the current editor element"
 
@@ -119,14 +156,19 @@ LeElementSnippetElement >> ensureCoderCreated [
 		ifTrue: [ ^ self ].
 
 	coderElement := self createCoderElement.
-	coderElement editor addEventHandler: (LeEditorReachedBorderEventHandler new snippetElement: self).
+	coderElement editor 
+		addEventHandler: (LeEditorReachedBorderEventHandler new 
+			snippetElement: self);
+		ensureNoUndoRedoShortcuts.
 	coderDecorationBar := self createCoderDecorationBar.
 	coderToolbar := self createCoderToolbar.
+	coderSlideActionsToolbar := self createCoderSlideActionsToolbar.
 
 	coderContainer := self createCoderContainer.
 	coderContainer
 		addChild: coderDecorationBar;
 		addChild: coderElement;
+		addChild: coderSlideActionsToolbar;
 		addChild: coderToolbar
 ]
 
@@ -148,7 +190,7 @@ LeElementSnippetElement >> exceptionAction [
 { #category : #private }
 LeElementSnippetElement >> generateDisplayElement [
 	[[		
-		self snippetViewModel doItAllRequestedBy: self ]
+		self snippetViewModel doItAllRequestedBy: (LeElementSnippetElementRequester new element: self) ]
 		on: Error
 			do: [ :ex | self exception: ex ]]
 		on: GtCoderEvaluationUnhandledError
@@ -176,18 +218,18 @@ LeElementSnippetElement >> initialize [
 	
 	sceneContainer := self createSceneContainer.
 	elementContainer := self createElementContainer.
-
+	snippetResizer := self createVerticalResizer
+		target: elementContainer.
+	self registerSnippetResizeEventsFor: snippetResizer.
+		
 	sceneContainer addChild: elementContainer as: #elementContainer.
-	sceneContainer addChild: (snippetResizer := self createVerticalResizer
-		target: elementContainer;
-		when: BlResizerResizedEvent do: [ :anEvent |
-			self snippetViewModel setElementHeightTo: anEvent extent y ]).
+	sceneContainer addChild: snippetResizer.
 
 	showCoderToggle := self createShowCodeToggleButton.
 	sceneContainer addChild: showCoderToggle.
 	sceneContainer addAptitude: (maximizerLook := BrGlamorousWithMaximizerAptitude new
-			// #displayElement;
-			preferredBackground: BrGlamorousColors backdropColor).
+		// #displayElement;
+		preferredBackground: BrGlamorousColors backdropColor).
 
 	self onSnippetViewModelFocused: false
 ]
@@ -220,7 +262,7 @@ LeElementSnippetElement >> isCoderCreated [
 
 { #category : #'private - event handling' }
 LeElementSnippetElement >> onCodeEvaluated: anEvaluatedAnnouncement [
-	(anEvaluatedAnnouncement isRequestedByElementOrItsChild: self)
+	(anEvaluatedAnnouncement requesterObject isRequestedByElementOrItsChild: self)
 		ifFalse: [ ^ self ].
 
 	self setElement: [ anEvaluatedAnnouncement evaluationResult value ]
@@ -239,6 +281,13 @@ LeElementSnippetElement >> onCodeVisibilityChanged [
 LeElementSnippetElement >> onHeightChanged [
 	elementContainer vExact: self snippetViewModel elementHeight.
 	self updateCoderHeight
+]
+
+{ #category : #'private - event handling' }
+LeElementSnippetElement >> onHeightTemporaryChangedFor: anAnnouncement [
+	elementContainer vExact: anAnnouncement elementHeight.
+	anAnnouncement codeHeight ifNotNil: [ :aHeight |
+		self updateCoderHeightTo:  aHeight ]
 ]
 
 { #category : #'private - event handling' }
@@ -290,13 +339,31 @@ LeElementSnippetElement >> onSnippetViewModelFocused: aBoolean [
 	self updateCoderWhenFocused: aBoolean
 ]
 
-{ #category : #initialization }
-LeElementSnippetElement >> registerEventsForCoder: aCoder [
+{ #category : #'private - coder' }
+LeElementSnippetElement >> registerCoderResizeEventsFor: aResizer [ 
+	aResizer
+		when: BlResizerResizedEvent do: [ :anEvent |
+			self snippetViewModel
+				temporaryResizeElementHeightTo: anEvent extent y ];
+		when: BlResizerResizeEndedEvent do: [ :anEvent |
+			anEvent hasVerticalChange ifTrue: [
+				self snippetViewModel 
+					resizeElementHeightTo: anEvent modifiedExtent y ] ]
+]
 
-	aCoder announcer weak
-		when: GtCoderEvaluationAnnouncement
-		send: #onCodeEvaluated:
-		to: self
+{ #category : #initialization }
+LeElementSnippetElement >> registerSnippetResizeEventsFor: aResizer [
+	"We update the size of the snipper in the model as the size changes,
+	but only issue a command at the very end."
+	
+	aResizer 
+		when: BlResizerResizedEvent do: [ :anEvent |
+			self snippetViewModel
+				temporarySetElementHeightTo: anEvent extent y ];
+		when: BlResizerResizeEndedEvent do: [ :anEvent |
+			anEvent hasVerticalChange ifTrue: [ 
+				self snippetViewModel 
+					setElementHeightTo: anEvent modifiedExtent y ] ]
 ]
 
 { #category : #private }
@@ -326,14 +393,16 @@ LeElementSnippetElement >> showCoder [
 		
 	sceneContainer addChild: coderContainer.
 	
-	elementContainer addChild: (coderResizer := self createVerticalResizer
-		target: elementContainer;
-		when: BlResizerResizedEvent do: [ :anEvent |
-			self snippetViewModel resizeElementHeightTo: anEvent extent y ]).
+	coderResizer := self createVerticalResizer
+		target: elementContainer.
+	self registerCoderResizeEventsFor: coderResizer.
+	
+	elementContainer addChild: coderResizer.
 
+	self updateCoderElementViewModel.
+	
 	self updateCoderWhenFocused: self snippetViewModel focused.
 	self updateCoderHeight.
-	self updateCoderElementViewModel
 ]
 
 { #category : #'api - view' }
@@ -376,6 +445,11 @@ LeElementSnippetElement >> subscribeToSnippetViewModel [
 		send: #onCodeVisibilityChanged
 		to: self.
 		
+	self snippetViewModel weak
+		when: LeElementSnippetViewModelTemporaryHeightChanged
+		send: #onHeightTemporaryChangedFor:
+		to: self.
+		
 	self snippetViewModel coderViewModel coder weak
 		when: GtCoderEvaluationAnnouncement
 		send: #onCodeEvaluated:
@@ -402,10 +476,15 @@ LeElementSnippetElement >> updateCoderElementViewModel [
 
 { #category : #'private - coder' }
 LeElementSnippetElement >> updateCoderHeight [
+	self updateCoderHeightTo: self snippetViewModel codeHeight
+]
+
+{ #category : #'private - coder' }
+LeElementSnippetElement >> updateCoderHeightTo: aHeight [
 	self isCoderCreated
 		ifFalse: [ ^ self ].
 
-	coderElement vExact: self snippetViewModel codeHeight
+	coderElement vExact: aHeight 
 ]
 
 { #category : #'private - coder' }
@@ -420,7 +499,7 @@ LeElementSnippetElement >> updateCoderWhenFocused: isFocused [
 	isFocused
 		ifTrue: [
 			coderDecorationBar constraintsDo: [ :c | c grid vertical span: 2 ].
-			coderDecorationBar background: (BrGlamorousColors primaryBorderColor alpha: 0.4) gtOpaqueColorOnWhite ]
+			coderDecorationBar background: BrGlamorousColors primaryBorderColor ]
 		ifFalse: [
 			coderDecorationBar constraintsDo: [ :c | c grid vertical span: 1 ].
 			coderDecorationBar background: BrGlamorousColors lightBorderColor ].
@@ -431,5 +510,9 @@ LeElementSnippetElement >> updateCoderWhenFocused: isFocused [
 			coderToolbar visibility: BlVisibility visible ]
 		ifFalse: [
 			coderToolbar constraintsDo: [ :c | c grid horizontal span: 2 ].
-			coderToolbar visibility: BlVisibility hidden ]
+			coderToolbar visibility: BlVisibility hidden ].
+	
+	isFocused
+		ifTrue: [ coderElement requestFocus ]
+		ifFalse: [ coderElement loseFocus ]
 ]

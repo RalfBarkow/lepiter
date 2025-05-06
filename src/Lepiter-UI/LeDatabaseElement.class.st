@@ -18,12 +18,6 @@ LeDatabaseElement >> database [
 ]
 
 { #category : #'api - accessing' }
-LeDatabaseElement >> database: aDatabase [
-	self deprecated: 'Use #databaseUIMoldel: instead'.
-	self halt
-]
-
-{ #category : #'api - accessing' }
 LeDatabaseElement >> databaseViewModel [
 	^ self contentUIModel
 ]

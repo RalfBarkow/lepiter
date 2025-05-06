@@ -6,6 +6,11 @@ Class {
 	#category : #'Lepiter-Core-Model'
 }
 
+{ #category : #testing }
+LeNullModel >> isNullObject [
+	^ true
+]
+
 { #category : #'announcer - subscription' }
 LeNullModel >> unsubscribe: anObject [
 	"Null models don't do anything, so ignore any announcement requests"

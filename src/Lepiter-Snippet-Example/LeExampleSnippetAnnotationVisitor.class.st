@@ -61,6 +61,11 @@ LeExampleSnippetAnnotationVisitor >> visitPreviewHeightArgument: aPreviewHeightA
 ]
 
 { #category : #generated }
+LeExampleSnippetAnnotationVisitor >> visitPreviewSelectArgument: aPreviewSelectArgument [
+	self exampleSnippet previewSelectSelector: aPreviewSelectArgument selectorValue
+]
+
+{ #category : #generated }
 LeExampleSnippetAnnotationVisitor >> visitPreviewShowArgument: aPreviewShowArgument [
 	self exampleSnippet previewShowSelector: aPreviewShowArgument selectorValue
 ]

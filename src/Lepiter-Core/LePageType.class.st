@@ -14,14 +14,6 @@ Class {
 }
 
 { #category : #factory }
-LePageType class >> date: aDate page: aLePage [
-
-	^ LeDailyNotePageType new 
-		date: aDate;
-		page: aLePage
-]
-
-{ #category : #factory }
 LePageType class >> default [
 	^ LeNamedPageType new
 ]
@@ -81,6 +73,14 @@ LePageType >> pageTypeClass [
 	"Answer the class used to store the pages in ${class:name=LeDatabase}$."
 
 	^ self class pageTypeClass
+]
+
+{ #category : #accessing }
+LePageType >> remoteLinkId [
+	"Answer the string to be used to identify the page in a remote link annotation ({{gtPage:...}})"
+	<return: #String>
+
+	^ 'id=', page uidString
 ]
 
 { #category : #'api - testing' }

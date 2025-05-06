@@ -10,13 +10,13 @@ LeLogicalDatabase >> gtDailyNotesFor: aView [
 	<gtView>
 	self pages ifNil: [ ^ aView empty ].
 	^ aView columnedTree
-		title: 'By Day';
+		title: 'By day';
 		priority: 9;
 		items: [ self dailyNotes ];
 		children: [ :eachPage | eachPage children ];
-		column: 'Title' item: #title;
-		column: 'Time' item: #editTime;
-		column: 'Author' item: #editEmail;
+		column: 'Title' text: #title;
+		column: 'Time' text: #editTime;
+		column: 'Author' text: #editEmail;
 		send: [ :eachPageOrPart | 
 			eachPageOrPart ]
 ]

@@ -7,36 +7,39 @@ Class {
 	#name : #LeSnippetExpandableWithBarAptitude,
 	#superclass : #LeSnippetExpandableAptitude,
 	#instVars : [
-		'snippetExpander'
+		'snippetExpander',
+		'contentContainer'
 	],
 	#category : #'Lepiter-UI-Snippet-Looks'
 }
+
+{ #category : #accessing }
+LeSnippetExpandableWithBarAptitude >> contentContainer [
+	^ contentContainer
+]
 
 { #category : #accessing }
 LeSnippetExpandableWithBarAptitude >> decorationBarWidth: aNumber [
 	snippetExpander width: aNumber
 ]
 
-{ #category : #private }
-LeSnippetExpandableWithBarAptitude >> hideActions [
-	super hideActions.
-	
-	snippetExpander constraintsDo: [ :c | c grid vertical span: 1 ].
-	snippetExpander background: BrGlamorousColors lightBorderColor
-]
-
 { #category : #initialization }
 LeSnippetExpandableWithBarAptitude >> initializeSnippetContainer [
-	snippetContainer := BlElement new
-		layout: (BlGridLayout horizontal columnCount: 2);
-		constraintsDo: [ :c |
-			c horizontal matchParent.
-			c vertical fitContent ];
+	contentContainer := BrVerticalPane new
+		hMatchParent;
 		clipChildren: false;
-		geometry: (BlRoundedRectangleGeometry cornerRadius: 4).
+		vFitContent.
+
+	snippetContainer := BrHorizontalPane new
+		hMatchParent;
+		vFitContent;
+		clipChildren: false;
+		geometry: (BlRoundedRectangleGeometry cornerRadius: 4);
+		addAptitude: (BrLayoutResizerAptitude new inherit: contentContainer).
 	
 	self initializeSnippetExpander.
-	snippetContainer addChild: snippetExpander
+	snippetContainer addChild: snippetExpander.
+	snippetContainer addChild: contentContainer.
 ]
 
 { #category : #initialization }
@@ -50,9 +53,22 @@ LeSnippetExpandableWithBarAptitude >> initializeSnippetExpander [
 ]
 
 { #category : #private }
-LeSnippetExpandableWithBarAptitude >> showActions [
-	super showActions.
+LeSnippetExpandableWithBarAptitude >> visuallyFocus [
+	super visuallyFocus.
 
-	snippetExpander constraintsDo: [ :c | c grid vertical span: 2 ].
-	snippetExpander background: (BrGlamorousColors primaryBorderColor alpha: 0.4) gtOpaqueColorOnWhite
+	snippetExpander background: (BrGlamorousColors primaryBorderColor ) gtOpaqueColorOnWhite
+]
+
+{ #category : #private }
+LeSnippetExpandableWithBarAptitude >> visuallyHover [
+	super visuallyHover.
+
+	snippetExpander background: BrGlamorousColors lightBorderColor
+]
+
+{ #category : #private }
+LeSnippetExpandableWithBarAptitude >> visuallyUnfocusAndUnhover [
+	super visuallyUnfocusAndUnhover.
+
+	snippetExpander background: BrGlamorousColors lightBorderColor
 ]

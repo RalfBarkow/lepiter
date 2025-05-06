@@ -1,7 +1,7 @@
 Class {
 	#name : #LeJavaScriptApplicationStrategy,
 	#superclass : #LeExternalServerStrategy,
-	#category : #'Lepiter-JavaScript'
+	#category : 'Lepiter-JavaScript'
 }
 
 { #category : #private }

@@ -71,6 +71,11 @@ LeNullContent >> incomingLinks [
 ]
 
 { #category : #'api - testing' }
+LeNullContent >> isExplicitLinks [
+	^ false
+]
+
+{ #category : #'api - testing' }
 LeNullContent >> isPage [
 	^ false
 ]

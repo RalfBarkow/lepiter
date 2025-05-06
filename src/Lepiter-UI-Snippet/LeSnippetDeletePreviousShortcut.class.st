@@ -19,6 +19,6 @@ LeSnippetDeletePreviousShortcut >> performOnEditor: aBrTextEditor snippet: aLeSn
 	(aBrTextEditor cursors first position isZero and: [ aBrTextEditor hasSelection not ])
 		ifTrue: [ ^ aLeSnippetElement mergeWithPrevious ].
 
-	BrEditorDeleteOneLetterBeforeCursorShortcut new
+	BrEditorShortcut deleteOneLetterBeforeCursor
 		performDueTo: aShortcutEvent
 ]

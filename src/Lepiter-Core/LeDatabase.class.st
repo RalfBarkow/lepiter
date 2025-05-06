@@ -26,7 +26,9 @@ Class {
 		'blocksByUID',
 		'filename',
 		'monitor',
-		'attachmentsByType'
+		'attachmentsByType',
+		'pagesByUuid',
+		'index'
 	],
 	#classVars : [
 		'LocalWorkspaceDatabaseLocation',
@@ -35,47 +37,90 @@ Class {
 	#category : #'Lepiter-Core-Model'
 }
 
+{ #category : #'instance creation' }
+LeDatabase class >> databaseNamed: aString [
+	^ LeDatabasesRegistry uniqueInstance defaultLogicalDatabase
+		databaseNamed: aString
+]
+
+{ #category : #'instance creation' }
+LeDatabase class >> gtBook [
+	^ self databaseNamed: self gtBookName
+]
+
+{ #category : #constant }
+LeDatabase class >> gtBookName [
+	^ 'Glamorous Toolkit Book'
+]
+
 { #category : #'api - instance creation' }
 LeDatabase class >> null [
 	^ LeNullDatabase default
+]
+
+{ #category : #'instance creation' }
+LeDatabase class >> primaryDB [
+	^ LeDatabasesRegistry uniqueInstance defaultLogicalDatabase primaryDB
 ]
 
 { #category : #'api - attachments' }
 LeDatabase >> addAttachmentByCopy: aFileReference [
 	"Copy the attached file to the receiver's DB and answer the relative path string to the file"
 	<return: #String>
-	| attachmentFileReference attachmentDirectory |
 
-	attachmentDirectory := self attachmentDirectoryAndMetadataFor: aFileReference.
-	attachmentFileReference := attachmentDirectory / aFileReference basename.
-	aFileReference copyTo: attachmentFileReference.
-	^ (attachmentFileReference relativeTo: self localStoreRootDirectory) fullName.
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
+
+	^ monitor addAttachmentByCopy: aFileReference
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> addAttachmentByCopy: aFileReference withId: aUuid [
+	"Copy the attached file to the receiver's DB and answer the relative path string to the file"
+	<return: #String>
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
+
+	^ monitor addAttachmentByCopy: aFileReference withId: aUuid
 ]
 
 { #category : #'api - attachments' }
 LeDatabase >> addAttachmentByMove: aFileReference [
 	"Move the attached file to the receiver's DB and answer the relative path string to the file"
 	<return: #String>
-	| attachmentFileReference attachmentDirectory |
 
-	attachmentDirectory := self attachmentDirectoryAndMetadataFor: aFileReference.
-	attachmentFileReference := attachmentDirectory / aFileReference basename.
-	aFileReference resolve copy moveTo: attachmentFileReference resolve.
-	^ (attachmentFileReference relativeTo: self localStoreRootDirectory) fullName.
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
 
+	^ monitor addAttachmentByMove: aFileReference
 ]
 
 { #category : #'api - attachments' }
 LeDatabase >> addAttachmentWithContent: aString named: aName [
 	"Create an attachment to the receiver's DB and answer the relative path string to the file"
 	<return: #String>
-	| attachmentFileReference attachmentDirectory |
 
-	attachmentDirectory := self attachmentDirectoryAndMetadataFor: aName asFileReference.
-	attachmentFileReference := attachmentDirectory / aName asString.
-	attachmentFileReference writeStreamEncoded: 'utf8' do: [ :aStream |
-		aStream nextPutAll: aString asString ].
-	^ (attachmentFileReference relativeTo: self localStoreRootDirectory) fullName.
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
+
+	^ monitor addAttachmentWithContent: aString named: aName
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> addAttachmentWithContent: aString named: aName withId: aUuid [
+	"Create an attachment to the receiver's DB and answer the relative path string to the file"
+	<return: #String>
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
+
+	^ monitor addAttachmentWithContent: aString named: aName withId: aUuid
 ]
 
 { #category : #'api - adding / removing' }
@@ -84,6 +129,8 @@ LeDatabase >> addPage: aLePage [
 	An exception handler may decide to ignore the page and answer nil if the page is a duplicate.
 	This is separated out into two operations so that bulk loads can add all new pages to a database before updating links (which may create new pages prematurely)."
 	| page |
+	
+	self assertNotReadOnly.
 
 	page := self setPage: aLePage.
 	page ifNotNil: [ self setPageUpdate: aLePage ].
@@ -101,6 +148,47 @@ LeDatabase >> announce: anAnnouncement [
 LeDatabase >> anyOne [
 
 	^ self do: [ :aPage | ^ aPage ]
+]
+
+{ #category : #'adding / removing' }
+LeDatabase >> assertNotReadOnly [
+
+	self assert: [ self readOnly isNil or: [ self readOnly not ] ]
+]
+
+{ #category : #'api - accessing' }
+LeDatabase >> asyncAllSnippets [
+	^ (self pages asAsyncStream collect: [ :page | page asyncAllSnippets ]) flatten
+]
+
+{ #category : #accessing }
+LeDatabase >> asyncPagesContainingText: aQueryString [
+	^ [ | filter results |
+	results := OrderedCollection new.
+	filter := LeSubstringFilter new
+			caseSensitive: false;
+			query: aQueryString.
+	self
+		pagesWithNameDo: [ :eachPage | (filter isMatchedItem: eachPage) ifTrue: [ results add: eachPage ] ].
+	self
+		unnamedPagesDo: [ :eachPage | (filter isMatchedItem: eachPage) ifTrue: [ results add: eachPage ] ].
+	results asAsyncStream ] asAsyncFuture asAsyncStream flatten
+]
+
+{ #category : #accessing }
+LeDatabase >> asyncPagesForWord: aString [
+	^ ((self index asyncTitlesForWord: aString)
+		collect: [ :each | self pageNamed: each ifAbsent: [  ] ]) select: #notNil
+]
+
+{ #category : #'api - query' }
+LeDatabase >> asyncSnippetClassReferencesTo: aString [
+	^ self index asyncSnippetClassReferencesTo: aString
+]
+
+{ #category : #'api - query' }
+LeDatabase >> asyncSnippetReferencesTo: aString [
+	^ self index asyncSnippetReferencesTo: aString
 ]
 
 { #category : #'api - accessing' }
@@ -124,28 +212,76 @@ LeDatabase >> at: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock forPageT
 	^ (pagesByType at: aPageType) at: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock
 ]
 
+{ #category : #'api - attachments' }
+LeDatabase >> attachmentBinaryStream: attachmentPath do: aBlock [
+	"Answer a stream on the binary contents of the supplied attachment path"
+
+	^ monitor attachmentBinaryStream: attachmentPath do: aBlock
+]
+
 { #category : #'api - accessing' }
 LeDatabase >> attachmentDirectories [
-	^ self monitor attachmentsDirectory directories collect: [:dir | dir]
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to get attachmentDirectories, monitor not configured'.
+
+	^ monitor attachmentDirectories
 ]
 
 { #category : #private }
 LeDatabase >> attachmentDirectoryAndMetadataFor: aFileReference [
 	"Create the attachment directory and populate the metadata for the supplied file reference.
 	Answer the directory."
-	| fileUID attachmentDirectory attachment |
+	<return: #FileReference>
 
-	self assert: [ aFileReference basename ~= 'lepiter_attachment.properties' ].
-	fileUID := UUID new asString36.
-	attachmentDirectory := self attachmentsDirectory / fileUID.
-	self assert: attachmentDirectory exists not.
-	attachmentDirectory ensureCreateDirectory.
-	attachment := LeAttachment new
-		originalReference: aFileReference asFileReference;
-		uploadDate: DateAndTime now;
-		uploadedBy: self userEmail.
-	attachment saveTo: attachmentDirectory for: self.
-	^ attachmentDirectory resolve
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
+
+	^ monitor attachmentDirectoryAndMetadataFor: aFileReference
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> attachmentNames [
+	"Return attachment names that, referencing to attachment files that are used by this snippet.
+	Polymorhic to {{gtMethod: LeContent >> #attachmentNames }}"
+
+	^ #()
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> attachmentProperties: attachmentPath [
+
+	^ monitor attachmentProperties: attachmentPath
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> attachmentUtf8Stream: attachmentPath do: aBlock [
+	"Answer a stream on the binary contents of the supplied attachment path"
+
+	^ monitor attachmentUtf8Stream: attachmentPath do: aBlock
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> attachmentWithDataForId: aUuid [
+	"Return an attachment object containing the attachment data"
+	<return: #LeAttachmentWithData>
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to search for attachment, monitor not configured'.
+
+	^ (monitor hasAttachmentWithId: aUuid) 
+		ifTrue: [ monitor attachmentWithDataForId: aUuid ]
+		ifFalse: [ nil ]
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> attachments [
+	^ LeContentAttachmentsCollector new
+		content: self;
+		all
 ]
 
 { #category : #'private - accessing' }
@@ -153,8 +289,9 @@ LeDatabase >> attachmentsDirectory [
 	"Answer the directory where DB attachments are stored"
 	<return: #FileReference>
 
-	self assert: monitor isNotNil
-			description: 'Unable to locate attachments'.
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to locate attachments'.
 
 	"The monitor is responsible for ensuring that the attachments directory exists"
 	^ monitor attachmentsDirectory.
@@ -179,6 +316,21 @@ LeDatabase >> children [
 	^ self pages
 ]
 
+{ #category : #'api - accessing' }
+LeDatabase >> commentPages [
+	^ self pages select: #hasCommentSnippets
+]
+
+{ #category : #callbacks }
+LeDatabase >> completeAddPageLaterFor: aTitleChangesAnnoucement [ 
+	"This is a callback for adding a page to a database only when the title changed.
+	This is added here so that registration for the announcement can be done using a
+	weak announcement."
+	
+	aTitleChangesAnnoucement page unsubscribe:  self.
+	self addPage: aTitleChangesAnnoucement page
+]
+
 { #category : #'api - enumerating' }
 LeDatabase >> dailyNotes [
 	"Answer the receiver's daily notes sorted by date"
@@ -196,7 +348,7 @@ LeDatabase >> dailyNotes [
 LeDatabase >> databaseName [
 	<return: #String or: nil>
 	
-	^ monitor ifNotNil: #databaseName
+	^ monitor ifNotNil: [ :aMonitor | aMonitor databaseName ]
 ]
 
 { #category : #accessing }
@@ -234,17 +386,23 @@ LeDatabase >> defaultFilename [
 
 { #category : #'api - adding / removing' }
 LeDatabase >> detachPage: aPage [
+
 	"I detach the page from the give database. The page could remain deleted or be later added to
 	another database."
-	
-	(pagesByType at: aPage pageTypeClass) removeKey: aPage databaseKey ifAbsent: [ "do nothing" ].
-	
+
+	self assertNotReadOnly.
+
+	(pagesByType at: aPage pageTypeClass)
+		removeKey: aPage databaseKey
+		ifAbsent: [ "do nothing" ].
+	pagesByUuid removeKey: aPage uid ifAbsent: [ "do nothing" ].
+
 	aPage removedFromDatabase: self.
 	self updateSortedCollectionsDueToRemoval: aPage.
-	
-	self announce: (LeDatabasePageRemoved new 
-		database: self;
-		page: aPage).
+
+	self announce: (LeDatabasePageRemoved new
+			 database: self;
+			 page: aPage)
 ]
 
 { #category : #'api - enumerating' }
@@ -255,11 +413,15 @@ LeDatabase >> do: aBlock [
 ]
 
 { #category : #'api - accessing' }
-LeDatabase >> ensurePageNamed: aString [ 
+LeDatabase >> ensurePageNamed: aString [
+
 	"Answer the page named aString, creating if necessary"
 
-	^ self pageNamed: aString 
-			ifAbsent: [ self pageBuilder title: aString; add ]
+	^ self pageNamed: aString ifAbsent: [ 
+		  self assertNotReadOnly.
+		  self pageBuilder
+			  title: aString;
+			  add ]
 ]
 
 { #category : #accessing }
@@ -271,12 +433,28 @@ LeDatabase >> filename [
 
 { #category : #accessing }
 LeDatabase >> filename: anObject [
+	
+	self assertNotReadOnly.
+
 	filename := anObject asFileReference
+]
+
+{ #category : #'api - attachments' }
+LeDatabase >> findAttachmentById: aUuid [
+	"Find the attachment with that UUID"
+	<return: #ByteArray>
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to search for attachment, monitor not configured'.
+
+	^ monitor findAttachmentById: aUuid
 ]
 
 { #category : #accessing }
 LeDatabase >> gtAttachmentsFor: aView [
 	<gtView>
+	monitor isVolatileMonitor ifTrue: [ ^ aView empty ].
 	self monitor ifNil: [ ^ aView empty ].
 	^ aView forward
 		title: 'Attachments';
@@ -290,22 +468,23 @@ LeDatabase >> gtDailyNotesFor: aView [
 	<gtView>
 	self pages ifNil: [ ^ aView empty ].
 	^ aView columnedTree
-		title: 'By Day';
+		title: 'By day';
 		priority: 10;
 		items: [ self dailyNotesGroup ];
 		children: [ :eachPage | eachPage children ];
-		column: 'Content' item: [ :aPageOrDailyNote |
+		column: 'Content' text: [ :aPageOrDailyNote |
 			(aPageOrDailyNote isKindOf: LeDailyNote)
 				ifTrue: [ aPageOrDailyNote date  ]
 				ifFalse: [ aPageOrDailyNote contentAsString ] ];
-		column: 'Time' item: [ :aPageOrDailyNote |
+		column: 'Time' text: [ :aPageOrDailyNote |
 			(aPageOrDailyNote isKindOf: LeDailyNote)
 				ifTrue: [ ''  ]
 				ifFalse: [ aPageOrDailyNote editTime ] ];
-		column: 'Author' item: [ :aPageOrDailyNote |
+		column: 'Author' text: [ :aPageOrDailyNote |
 			(aPageOrDailyNote isKindOf: LeDailyNote)
 				ifTrue: [ ''  ]
-				ifFalse: [ aPageOrDailyNote editEmail ] ]
+				ifFalse: [ aPageOrDailyNote editEmail ] ];
+		actionUpdateButton
 ]
 
 { #category : #'gt-extensions' }
@@ -317,7 +496,7 @@ LeDatabase >> gtMapFor: aView [
 			m nodes 
 				stencil: [:each | BlElement new
 					size: 5@5; 
-					geometry: BlCircle new; 
+					geometry: BlCircleGeometry new; 
 					background: (each isDailyNote ifTrue: [Color blue] ifFalse: [Color red])];
 				with: (self pagesByDate select: [:each | 
 					each allChildOutgoingTextualLinks notEmpty or: [each incomingLinks notEmpty]]) .
@@ -333,6 +512,7 @@ LeDatabase >> gtMapFor: aView [
 { #category : #accessing }
 LeDatabase >> gtViewCorruptFilesFor: aView [
 	<gtView>
+	monitor isVolatileMonitor ifTrue: [ ^ aView empty ].
 	monitor ifNil: [ ^ aView empty ].
 	^ aView forward
 		title: 'Corrupt files';
@@ -344,9 +524,10 @@ LeDatabase >> gtViewCorruptFilesFor: aView [
 { #category : #accessing }
 LeDatabase >> gtViewFilesNameMappingFor: aView [
 	<gtView>
+	monitor isVolatileMonitor ifTrue: [ ^ aView empty ].
 	monitor ifNil: [ ^ aView empty ].
 	^ aView forward
-		title: 'Page File Mappings';
+		title: 'Page file mappings';
 		priority: 66;
 		object: [ self monitor ];
 		view: #gtNameMappingFor:
@@ -364,23 +545,13 @@ LeDatabase >> gtViewPagesByTypeFor: aView [
 		send: #value
 ]
 
-{ #category : #accessing }
-LeDatabase >> gtViewTableOfContentsNodesFor: aView [
-	<gtView>
-	^ aView tree
-		title: 'Table of Content Nodes';
-		priority: 50;
-		items: [ self tableOfContentsNodes  ];
-		children: #children
-]
-
 { #category : #'gt-extensions' }
 LeDatabase >> gtViewUnnamedPageFor: aView [
 	<gtView>
 	(pagesByType includesKey: LeUnnamedPageType)
 		ifFalse: [ ^ aView empty ].
 	^ aView columnedList
-		title: 'Unnamed Pages';
+		title: 'Unnamed pages';
 		priority: 55;
 		items: [ (pagesByType at: LeUnnamedPageType) values ];
 		column: 'Created time' text: [ :aPage | aPage createTime ];
@@ -395,6 +566,18 @@ LeDatabase >> gtViewUnnamedPageFor: aView [
 				ifFalse: [ aPage children first ] ]
 ]
 
+{ #category : #'api - attachments' }
+LeDatabase >> hasAttachmentWithId: aUuid [
+	"Check whether the attachment with that name already exists"
+	<return: #String>
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to search for attachment, monitor not configured'.
+
+	^ monitor hasAttachmentWithId: aUuid
+]
+
 { #category : #'api - testing' }
 LeDatabase >> hasBlockUID: aLeUID [
 
@@ -406,6 +589,11 @@ LeDatabase >> hasChildren [
 
 	self do: [ :aPage | ^ true ].
 	^ false
+]
+
+{ #category : #'api - testing' }
+LeDatabase >> hasCommentPages [
+	^ self commentPages notEmpty
 ]
 
 { #category : #'api - testing' }
@@ -431,11 +619,9 @@ LeDatabase >> hasPageNamed: aTitle [
 
 { #category : #'private - testing' }
 LeDatabase >> hasPageUID: aUUID [
-	"Answer a boolean indicating whether the receiver includes a page with the supplied UID.
-	This is a slow method and should only be used while adding pages"
+	"Answer a boolean indicating whether the receiver includes a page with the supplied UID"
 
-	self do: [ :each | each uid = aUUID ifTrue: [ ^ true ] ].
-	^ false
+	^ pagesByUuid includesKey: aUUID
 ]
 
 { #category : #'api - query' }
@@ -466,15 +652,22 @@ LeDatabase >> hasTextualSnippetLinks [
 	^ self textualSnippetsLinksCount > 0
 ]
 
+{ #category : #accessing }
+LeDatabase >> index [
+	^ index ifNil: [ index := LeDatabaseIndex new database: self ]
+]
+
 { #category : #initialization }
 LeDatabase >> initialize [
 	super initialize.
+	readOnly := false.
 	pagesByType := IdentityDictionary new.
+	pagesByUuid := Dictionary new.
 	"Populate all the page types"
 	LePageType subclassesDo: [ :pageType |
 		pagesByType
 			at: pageType pageTypeClass
-			ifAbsentPut: [ Dictionary new ] ].
+			ifAbsentPut: [ GtStringContentDictionary new ] ].
 	blocksByUID := Dictionary new.
 	self ensureExplicitLinksStorage.
 	self weak
@@ -499,6 +692,11 @@ LeDatabase >> isPrimary [
 	^ self parent
 		ifNotNil: [ :aParent | aParent isPrimary: self ]
 		ifNil: [ true ]
+]
+
+{ #category : #'api - query' }
+LeDatabase >> leSnippetsInDB [
+	^ LeSearchDatabaseSnippetFilter forDatabase: self
 ]
 
 { #category : #'private - accessing' }
@@ -547,8 +745,11 @@ LeDatabase >> linksWithTargetReferenceMatching: aLinkReference [
 
 { #category : #'api - accessing' }
 LeDatabase >> localStoreRootDirectory [
+	"Answer the directory where the receiver's data is stored.
+	This should no longer be used as non-disk based stores are being added, use #storeLocation as a more general comparison of whether databases have the same data store."
 	<return: #FileReference or: nil>
-	^ monitor ifNotNil: #localRoot
+
+	^ monitor ifNotNil: [ :aMonitor | aMonitor localRoot ]
 ]
 
 { #category : #accessing }
@@ -590,7 +791,7 @@ LeDatabase >> newUID [
 	Ensure the UID doesn't already exist"
 	| uid |
 
-	[ uid := LeUID new uid: UUID new.
+	[ uid := LeUID new.
 	blocksByUID includesKey: uid ] whileTrue.
 
 	^ uid
@@ -608,21 +809,6 @@ LeDatabase >> newUniqueUuid [
 		[ newUuid := UUID new ].
 	
 	^ newUuid
-]
-
-{ #category : #'private - notifying' }
-LeDatabase >> notifyTableOfContensPageIdChangedFrom: anOldUUID to: aNewUUID [
-
-	| anOldPage |
-	anOldPage := anOldUUID ifNotNil: [
-		self pageWithID: anOldUUID ifAbsent: [ nil ] ].
-
-	self announce: (LeDatabaseTableOfContentsUUIDChanged new
-		database: self;
-		oldId: anOldUUID;
-		oldPage: anOldPage;
-		newId: aNewUUID;
-		newPage: self tableOfContents)
 ]
 
 { #category : #'private - hooks' }
@@ -643,6 +829,23 @@ LeDatabase >> onPageTitleChanged: aLePageTitleChanged [
 { #category : #'api - adding / removing' }
 LeDatabase >> pageBuilder [
 	^ LeDatabasePageBuilder new database: self
+]
+
+{ #category : #accessing }
+LeDatabase >> pageByUuid: aUUID [
+	^ pagesByUuid at: aUUID
+]
+
+{ #category : #accessing }
+LeDatabase >> pageByUuid: aUUID ifAbsent: absentBlock [
+
+	^ pagesByUuid at: aUUID ifAbsent: absentBlock
+]
+
+{ #category : #accessing }
+LeDatabase >> pageByUuid: aUUID ifPresent: aBlock [
+
+	^ pagesByUuid at: aUUID ifPresent: aBlock
 ]
 
 { #category : #paging }
@@ -696,6 +899,12 @@ LeDatabase >> pageNamed: aString inDatabase: targetDatabaseUID ifDbAbsent: dbAbs
 LeDatabase >> pageNames [
 
 	^ self pagesByName keys
+]
+
+{ #category : #'api - accessing' }
+LeDatabase >> pageUIDs [
+
+	^ pagesByUuid keys
 ]
 
 { #category : #'api - accessing' }
@@ -771,7 +980,8 @@ LeDatabase >> pagesByDate [
 { #category : #'api - accessing' }
 LeDatabase >> pagesByDateToShow [
 	^ self pagesByDate reject: [ :aPage |
-		aPage type isPharoClassPageType  ]
+		aPage type isPharoClassPageType or: [
+		aPage type isProxyClassPageType ] ]
 ]
 
 { #category : #'private - accessing' }
@@ -836,10 +1046,21 @@ LeDatabase >> reSortCollectionsDueTo: aLePageTitleChanged [
 
 { #category : #'adding / removing' }
 LeDatabase >> registerSnippet: aSnippet [
-	self assert: [ aSnippet uid notNil ].
-	self assert: [ aSnippet uid uid notNil ].
-	self assert: [ (blocksByUID includesKey: aSnippet uid) not ].
-	
+
+	self
+		assert: [ aSnippet uid notNil ]
+		description: [ 'Snippet UID must be non-nil: ' , aSnippet asString ].
+	self
+		assert: [ aSnippet uid uid notNil ]
+		description: [ 
+		'Snippet UID''s uid must be non-nil: ' , aSnippet uid asString ].
+	self
+		assert: [ (blocksByUID includesKey: aSnippet uid) not ]
+		description: [ 
+			'There is already a snippet with the same UID, existing '
+			, (blocksByUID at: aSnippet uid) asString , ', registering '
+			, aSnippet asString ].
+
 	blocksByUID at: aSnippet uid put: aSnippet
 ]
 
@@ -853,19 +1074,33 @@ LeDatabase >> reload [
 
 { #category : #'private - development' }
 LeDatabase >> removeEmptyPages [
+
 	"Remove empty pages from the receiver.
 	This is just for manual maintenace during development"
+
 	| emptyPages |
+	self assertNotReadOnly.
 
 	emptyPages := self pages select: [ :each | each isEmpty ].
-	emptyPages do: [ :page |
-		self removePage: page ]
+	emptyPages do: [ :page | self removePage: page ]
 ]
 
 { #category : #'api - adding / removing' }
 LeDatabase >> removeFromParentDatabase [
+
+	self assertNotReadOnly.
+
 	self parent ifNil: [ ^ self ].
-	self parent removeDB: self.
+	self parent removeDB: self
+]
+
+{ #category : #'api - adding / removing' }
+LeDatabase >> removeFromParentDatabaseUpdatingProperties [
+	| aParent |
+	aParent := self parent.
+	
+	self removeFromParentDatabase.
+	aParent ifNotNil: [ aParent saveProperties ].
 ]
 
 { #category : #'api - adding / removing' }
@@ -910,24 +1145,24 @@ LeDatabase >> setPage: aLePage [
 	"Add the supplied page to the receiver without updating links and metadata.
 	This may be used as part of a bulk load to ensure linked pages aren't created prematurely.
 	Raise an error if a page with the same title exists."
+
 	| pages duplicate |
-	
-	pages := pagesByType at: aLePage pageTypeClass.
-
-	"Allow an exception handler to either ignore a duplicate page or repair it, and carry on"
-	duplicate := (pages includesKey: aLePage databaseKey) ifTrue: 
-		[ LeDuplicatePageIdError new page: aLePage; signal ]
-	ifFalse:
-		[ false ].
-	duplicate ifTrue: [ ^ nil ].
-
-	"Ensure that the page UID is unique within the database.
+	pages := pagesByType at: aLePage pageTypeClass.	"Allow an exception handler to either ignore a duplicate page or repair it, and carry on"
+	duplicate := (pages includesKey: aLePage databaseKey)
+			ifTrue: [ LeDuplicatePageIdError new
+					database: self;
+					pageInCurrentDatabase: (pages at: aLePage databaseKey);
+					pageToAdd: aLePage;
+					signal.
+					true]
+			ifFalse: [ false ].
+	duplicate ifTrue: [ ^ nil ].	"Ensure that the page UID is unique within the database.
 	This is the one time a page can have its UID changed."
-	[ self hasPageUID: aLePage uid ] whileTrue:
-		[ aLePage assignNewUID ].
+	[ self hasPageUID: aLePage uid ] whileTrue: [ aLePage assignNewUID ].
 
 	aLePage aboutToAddToDatabase: self.
 	pages at: aLePage databaseKey put: aLePage.
+	pagesByUuid at: aLePage uid put: aLePage.
 
 	^ aLePage
 ]
@@ -1002,33 +1237,25 @@ LeDatabase >> stopMonitoring [
 	monitor ifNotNil: [ monitor stopMonitoring ]
 ]
 
-{ #category : #accessing }
-LeDatabase >> tableOfContents [ 
+{ #category : #'api - accessing' }
+LeDatabase >> storeLocation [
+	"Answer the location of the receiver's data store.
+	E.g. for a disk based store it is the directory, for a class based store it is the class.
+	If the database doesn't have a store, answer itself since two databases without stores can be considered the same."
+	<return: #Object>
 
-	^ self tableOfContentsPageID
-		ifNotNil: [ :pageID | self pageWithID: pageID ]
+	^ monitor 
+		ifNil: [ self ]
+		ifNotNil: [ :aMonitor | aMonitor storeLocation ]
 ]
 
-{ #category : #accessing }
-LeDatabase >> tableOfContentsPageID [
-	"Answer the page UUID for the Table Of Contents, or nil if not set"
+{ #category : #'api - accessing' }
+LeDatabase >> tagPages [
+	"Return a list of named pages whose titles consist of a single word (potentially a tag)."
 
-	^ monitor ifNotNil: #tableOfContentsPageID 
-]
-
-{ #category : #accessing }
-LeDatabase >> tableOfContentsPageID: aNewUUID [
-	"Set the page UUID for the Table Of Contents.  nil to clear the ToC"
-
-	| anOldUUID |
-	anOldUUID := self tableOfContentsPageID.
-
-	(anOldUUID = aNewUUID) ifTrue: [ ^ self ].
-
-	monitor tableOfContentsPageID: aNewUUID.
-	
-	self notifyTableOfContensPageIdChangedFrom: anOldUUID to: aNewUUID.
-	
+	^ (self pages
+		select: [ :p | p isUnnamedPage not and: [ p title substrings size = 1 ] ])
+		sort: [ :a :b | a title < b title ]
 ]
 
 { #category : #'api - accessing' }
@@ -1057,7 +1284,8 @@ LeDatabase >> unload [
 
 	self stopMonitoring.
 	self pagesDo: [ :page | page unload ].
-	self announcer announce: (LeDatabaseUnloadAnnouncement new content: self).
+	self announcer 
+		announce: (LeDatabaseUnloadAnnouncement new content: self).
 ]
 
 { #category : #'private - accessing' }
@@ -1077,10 +1305,13 @@ LeDatabase >> unnamedPagesDo: aBlock [
 
 { #category : #'adding / removing' }
 LeDatabase >> unregisterSnippet: aSnippet [
+
+	self assertNotReadOnly.
 	self assert: [ aSnippet uid notNil ].
 	self assert: [ aSnippet uid uid notNil ].
-	self assert: [ (blocksByUID includesKey: aSnippet uid) ].
-	
+	self assert: [ blocksByUID includesKey: aSnippet uid ].
+
+
 	blocksByUID removeKey: aSnippet uid
 ]
 
@@ -1093,13 +1324,24 @@ LeDatabase >> updateAttachmentNamed: aFileName content: anObject [
 		aStream nextPutAll: anObject asString ].
 ]
 
+{ #category : #'api - attachments' }
+LeDatabase >> updateAttachmentWithContent: aString named: aName withId: aUuid [
+	"Update an attachment to the receiver's DB and answer the relative path string to the file"
+	<return: #String>
+
+	self 
+		assert: monitor isNotNil
+		description: 'Unable to add attachment, monitor not configured'.
+
+	^ monitor updateAttachmentWithContent: aString named: aName withId: aUuid
+]
+
 { #category : #'private - hooks' }
 LeDatabase >> updateByTypeStorageDueTo: aLePageTitleChanged [
 	| aPage oldTypeClass newTypeClass |
 	aPage := aLePageTitleChanged page.
 	oldTypeClass := aLePageTitleChanged oldType class pageTypeClass.
 	newTypeClass := aLePageTitleChanged newType class pageTypeClass.
-	
 	self 
 		at: aLePageTitleChanged oldDatabaseKey 
 		ifPresent: [ 

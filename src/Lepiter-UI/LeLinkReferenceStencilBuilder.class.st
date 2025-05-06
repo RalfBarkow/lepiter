@@ -62,3 +62,10 @@ LeLinkReferenceStencilBuilder >> paramsOn: aStencilExecutor [
 		push: self page;
 		push: self database
 ]
+
+{ #category : #accessing }
+LeLinkReferenceStencilBuilder >> reset [
+	linkReference := nil.
+	page := nil.
+	database := nil
+]

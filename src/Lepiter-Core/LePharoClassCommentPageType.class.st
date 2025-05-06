@@ -84,5 +84,5 @@ LePharoClassCommentPageType >> printOn: aStream [
 { #category : #accessing }
 LePharoClassCommentPageType >> title [
 
-	^ pharoClassName, ' Comment'
+	^ pharoClassName asString, ' Comment'
 ]

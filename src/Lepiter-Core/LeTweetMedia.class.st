@@ -19,7 +19,7 @@ LeTweetMedia >> gtLiveFor: aView [
 		title: 'Live';
 		priority: 10;
 		stencil: [
-			BlUrlImageElement new
+			BrAsyncFileWidget new
 				url: (self url asZnUrl & ('format' -> 'jpg')) asString;
 				constraintsDo: [ :c |
 					c horizontal matchParent.
@@ -32,7 +32,7 @@ LeTweetMedia >> gtRawDataFor: aView [
 	<gtView>
 	self hasRawData ifFalse: [ ^ aView empty ].
 	^ aView forward
-		title: 'Raw Data';
+		title: 'Raw data';
 		priority: 25;
 		object: [ self rawData ];
 		view: #gtItemsFor:

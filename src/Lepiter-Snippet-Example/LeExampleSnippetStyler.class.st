@@ -88,6 +88,16 @@ LeExampleSnippetStyler >> visitPreviewHeightArgument: aPreviewHeightArgument [
 ]
 
 { #category : #generated }
+LeExampleSnippetStyler >> visitPreviewSelectArgument: aPreviewSelectArgument [
+	self visitArgument: aPreviewSelectArgument.
+
+	self
+		attributes: { BlTextForegroundAttribute color: Color magenta muchDarker }
+		from: aPreviewSelectArgument value startPosition
+		to: aPreviewSelectArgument value stopPosition.
+]
+
+{ #category : #generated }
 LeExampleSnippetStyler >> visitPreviewShowArgument: aPreviewShowArgument [
 	self visitArgument: aPreviewShowArgument.
 

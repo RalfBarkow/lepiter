@@ -1,5 +1,5 @@
 "
-LeBlock is the common, abstract, superclass of all the content that can be added to a Lepiter Page.
+LeSnippet is the common, abstract, superclass of all the content that can be added to a Lepiter Page.
 
  
 ## Internal Representation and Key Implementation Points.
@@ -21,21 +21,21 @@ Class {
 	#category : #'Lepiter-Core-Model'
 }
 
+{ #category : #accessing }
+LeSnippet class >> description [
+	^ ''
+]
+
+{ #category : #accessing }
+LeSnippet class >> stateAttributes [
+	^ self leJsonV4AttributeMapping collect: [ :aMapping |
+		LeGenericSnippetStateAttribute named: aMapping key ]
+]
+
 { #category : #visiting }
 LeSnippet >> acceptVisitor: aVisitor [
 
 	^ aVisitor visitSnippet: self
-]
-
-{ #category : #'api - editing' }
-LeSnippet >> addChildOrSiblingSnippet: aNewSnippet [
-	"Add a new snippet that is either:
-	- a sibling of the receiver if there are no children.
-	- the first child of the receiver."
-	
-	^ self hasChildren
-		ifTrue: [ self addFirstSnippet: aNewSnippet ]
-		ifFalse: [ self addSnippetAfterSelf: aNewSnippet ].
 ]
 
 { #category : #'api - editing' }
@@ -62,14 +62,9 @@ page is associated to a database. If not the link will be lost.'.
 		targetReference: aTargetReference).
 ]
 
-{ #category : #'api - editing' }
-LeSnippet >> addFirstSnippet: aLeSnippet [
-	"Add the supplied block as the first child of the receiver"
-
-	self children addFirstChild: aLeSnippet.
-	aLeSnippet addedToParent: self.
-	self announceContentAdded: aLeSnippet.
-	^ aLeSnippet
+{ #category : #refactoring }
+LeSnippet >> addParameterTo: oldName using: aRewriter [
+	^ nil
 ]
 
 { #category : #'api - editing' }
@@ -110,6 +105,24 @@ LeSnippet >> addedToParent: aParent [
 	self addedToDatabase: aParent database.
 ]
 
+{ #category : #accessing }
+LeSnippet >> additionalStateForCopying [
+
+	^ LeGenericSnippetState new
+]
+
+{ #category : #accessing }
+LeSnippet >> allSnippetVariables [
+	| variables |
+	variables := Set new.
+	self page ifNil: [ ^ variables ].
+	self page
+		allChildrenDepthFirstDo: [ :each | 
+			each isCodeSnippet
+				ifTrue: [ variables addAll: each coder implicitVariableNames ] ].
+	^ variables
+]
+
 { #category : #'private - notifications' }
 LeSnippet >> announceContentChanged [
 	"Notify all dependents that the snippet's content (for example properties) has changed"
@@ -124,16 +137,6 @@ LeSnippet >> announceContentChangedBy: aSourceObject [
 	self notifyAnnouncement: (LeSnippetContentChanged new
 		source: aSourceObject;
 		snippet: self)
-]
-
-{ #category : #'api - attaching / detaching' }
-LeSnippet >> attachChildSnippet: aNewSnippet [
-	self assert: [ aNewSnippet notNil ].
-	self assert: [ aNewSnippet parent isNil ].
-	
-	self children addChild: aNewSnippet.
-	aNewSnippet attachToParent: self.
-	^ aNewSnippet
 ]
 
 { #category : #'api - attaching / detaching' }
@@ -156,17 +159,109 @@ LeSnippet >> attachToParent: aParentSnippet [
 	self parent: aParentSnippet
 ]
 
-{ #category : #'api - attaching / detaching' }
-LeSnippet >> detachChildSnippet: aLeSnippet [
-	self assert: [ aLeSnippet notNil ].
-	self assert: [ aLeSnippet parent notNil ].
+{ #category : #'api - attachments' }
+LeSnippet >> attachments [
+	^ LeContentAttachmentsCollector new
+		content: self;
+		local
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> canBeIndented [
+	"A snippet can be indented as long as it is not the first child.
+	Indenting adds it as a child of the previous sibling"
 	
-	self children removeSnippet: aLeSnippet.
+	^ self isFirstChild not
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> canBeMovedDown [
+	"A snippet can me moved down if there are children below it,
+	or its parent has siblings below it."
+	
+	^ self isLastChild not or: [
+		self parent isSnippet and: [
+			self parent isLastChild not ] ].
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> canBeMovedUp [
+	"A snippet can me moved up if there are children above it,
+	or its parent has siblings above it."
+	
+	^ self isFirstChild not or: [
+		self parent isSnippet and: [
+			self parent isFirstChild not ] ].
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> canBeUnindented [
+	"A snippet can be unintented as long as its parent is another snippet.
+	Unindenting adds it as a sibling of the parent sibling"
+	
+	^ self parent isSnippet
+]
+
+{ #category : #testing }
+LeSnippet >> canMoveToAnotherDatabase [
+	"For the moment, if a snippet has links to attachments in the database or is somehow tied to other files, it cannot be moved.
+	Each snippet class should implement this as true or false, or implement the corresponding logic."
+	^ false
+]
+
+{ #category : #refactoring }
+LeSnippet >> changeToRenameClass: oldName to: newName [
+	^ nil
+]
+
+{ #category : #refactoring }
+LeSnippet >> changeToRenameSelector: oldName to: newName using: aRewriter [
+	^ nil
+]
+
+{ #category : #references }
+LeSnippet >> classAndSelectorReferencesPromise [
+	^ #(#() #()) asAsyncPromise
+]
+
+{ #category : #'api - commands' }
+LeSnippet >> commandBuilder [
+	^ LeSnippetCommandBuilder forContent: self
 ]
 
 { #category : #'api - attaching / detaching' }
 LeSnippet >> detachFromParent [
 	self parent: nil
+]
+
+{ #category : #history }
+LeSnippet >> extractCommonState [
+	^ LeCommonSnippetStateExtractor fromSnippet: self
+]
+
+{ #category : #history }
+LeSnippet >> extractSpecificState [
+	^ LeSpecificSnippetStateExtractor fromSnippet: self
+]
+
+{ #category : #history }
+LeSnippet >> extractSpecificStateBasedOnState: aSnippetState [ 
+	^ (LeSpecificSnippetStateExtractor forSnippet: self)
+		targetState: aSnippetState;
+		extractState
+]
+
+{ #category : #history }
+LeSnippet >> extractUpdatableState [
+	^ LeUpdatableSnippetStateExtractor fromSnippet: self
+]
+
+{ #category : #history }
+LeSnippet >> extractUpdatableStateBasedOnState: aSnippetState [ 
+	^ self extractCommonState
+		appendState: (self 
+			extractSpecificStateBasedOnState: aSnippetState);
+		yourself
 ]
 
 { #category : #'api - testing' }
@@ -195,13 +290,55 @@ LeSnippet >> indent [
 	self parent indentSnippet: self.
 ]
 
+{ #category : #'api - command building' }
+LeSnippet >> indentCommand [
+	"Create a command for indenting the snippet"
+	
+	^ self commandBuilder indentSnippetCommand
+]
+
+{ #category : #'api - command operations' }
+LeSnippet >> indentThroughCommand [
+	^ self indentCommand execute
+]
+
+{ #category : #'api - command building' }
+LeSnippet >> insertSnippetBeforeSelfCommandOfType: aNewSnippetClass [
+	"Create a command for adding new snippet of the given type before the receiver. "
+	
+	^ self parent 
+		insertChildCommandBeforeSnippet: self 
+		ofType: aNewSnippetClass
+]
+
+{ #category : #testing }
+LeSnippet >> isAbstract [
+	"LeSnippet methods select: #isAbstract"
+	^ true
+]
+
 { #category : #'api - testing' }
 LeSnippet >> isCodeSnippet [
 
 	^ false
 ]
 
-{ #category : #testing }
+{ #category : #'api - testing' }
+LeSnippet >> isCommentSnippet [
+	^ false
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> isFirstChild [
+	^ self parent isChildAtFirstPositionFor: self
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> isLastChild [
+	^ self parent isChildAtLastPositionFor: self
+]
+
+{ #category : #'api - testing' }
 LeSnippet >> isSnippet [
 
 	^ true
@@ -213,24 +350,51 @@ LeSnippet >> isTextSnippet [
 	^ false
 ]
 
+{ #category : #'api - testing' }
+LeSnippet >> isTextualSnippet [
+
+	^ false
+]
+
+{ #category : #'api - testing' }
+LeSnippet >> isUnknownSnippet [ 
+	^ false
+]
+
+{ #category : #'api - enumerating' }
+LeSnippet >> locateNextFocusedSnippetAfterRemove [
+	"Return the snippet that should get the focus after this snippet is removed, or nil if there are no more snippets."
+	
+	^ self  
+		previousSnippetDo: [ :aSnippet |  aSnippet ] 
+		ifNone: [
+			self  
+				nextSnippetDo: [ :aSnippet | aSnippet ] 
+				ifNone: [ nil ] ] 
+]
+
 { #category : #'api - editing' }
 LeSnippet >> mergeWithNext [
-	"Merge the contents of the receiver with the next block (the next sibling, or the parent's next).
-	Answer the merged block."
+	"Merge the contents of the receiver with the next snippet (the next sibling, or the parent's next).
+	Answer the merged snippet."
 
 	^ self 
-		nextSnippetDo: [ :nextBlock | self requestMergeWithBlock: nextBlock ] 
-		ifNone: [ self error: 'Can''t merge the last block with a following block' ].
+		nextSnippetDo: [ :nextSnippet | 
+			self requestMergeWithSnippet: nextSnippet ] 
+		ifNone: [ 
+			self error: 'Can''t merge the last snippet with a following snippet' ].
 ]
 
 { #category : #'api - editing' }
 LeSnippet >> mergeWithPrevious [
-	"Merge the contents of the receiver with the previous block (the previous sibling, or the parent itself).
-	Answer the merged block."
+	"Merge the contents of the receiver with the previous snippet (the previous sibling, or the parent itself).
+	Answer the merged snippet."
 
 	^ self 
-		previousSnippetDo: [ :previousBlock | previousBlock requestMergeWithBlock: self ] 
-		ifNone: [ self error: 'Can''t merge the first block with a previous block' ].
+		previousSnippetDo: [ :previousSnippet | 
+			previousSnippet requestMergeWithSnippet: self ] 
+		ifNone: [ 
+			self error: 'Can''t merge the first snippet with a previous snippet' ].
 ]
 
 { #category : #'api - editing' }
@@ -238,7 +402,25 @@ LeSnippet >> moveDown [
 	"Move the receiver down one snippet.
 	If the receiver has a sibling below it, move there, if not and the receiver's parent has a sibling below, move there"
 
-	self parent moveDownSnippet: self.
+	^ self parent moveDownSnippet: self.
+]
+
+{ #category : #'api - command building' }
+LeSnippet >> moveDownCommand [
+	"Create a command for moving up the snippet"
+	
+	^ self commandBuilder moveDownSnippetCommand
+]
+
+{ #category : #'api - command operations' }
+LeSnippet >> moveDownThroughCommand [
+	^ self moveDownCommand execute
+]
+
+{ #category : #'api - editing' }
+LeSnippet >> moveToPage: aPage [
+	self page removeSnippet: self.
+	aPage addSnippet: self
 ]
 
 { #category : #'api - editing' }
@@ -246,7 +428,19 @@ LeSnippet >> moveUp [
 	"Move the receiver up one snippet.
 	If the receiver has a sibling below it, move there, if not and the receiver's parent has a sibling below, move there"
 
-	self parent moveUpSnippet: self.
+	^ self parent moveUpSnippet: self.
+]
+
+{ #category : #'api - command building' }
+LeSnippet >> moveUpCommand [
+	"Create a command for moving up the snippet"
+	
+	^ self commandBuilder moveUpSnippetCommand
+]
+
+{ #category : #'api - command operations' }
+LeSnippet >> moveUpThroughCommand [
+	^ self moveUpCommand execute
 ]
 
 { #category : #'api - enumerating' }
@@ -330,6 +524,7 @@ LeSnippet >> notifyAnnouncement: anAnnouncement [
 LeSnippet >> onAboutToAddToDatabase: aDatabase [ 
 	"Ensure the receiver has a uid before it is added to a database"
 	super onAboutToAddToDatabase: aDatabase .
+	
 	uid ifNil: [ uid := aDatabase newUID ].
 	aDatabase registerSnippet: self.
 ]
@@ -407,12 +602,9 @@ LeSnippet >> previousSnippetDo: aBlock ifNone: aNoneBlock [
 		ifFalse: [ aBlock value: (self parent children at: myIndex - 1) lastChildOrSelf ]
 ]
 
-{ #category : #'private - updating' }
-LeSnippet >> reloadAttributesFromContent: aSnippet [
-	| attributesReloader |
-	attributesReloader := LeContentAttributesReloader forContent: self.
-	attributesReloader reloadFromContent: aSnippet.
-	^ attributesReloader hasChanges
+{ #category : #refactoring }
+LeSnippet >> removeParameterFrom: oldName using: aRewriter [
+	^ nil
 ]
 
 { #category : #removing }
@@ -424,15 +616,25 @@ LeSnippet >> removeSelf [
 	self parent removeSnippet: self
 ]
 
+{ #category : #'api - command building' }
+LeSnippet >> removeSelfCommand [
+	^ self parent removeChildCommandFor: self 
+]
+
+{ #category : #'api - command operations' }
+LeSnippet >> removeSelfThroughCommand [
+	^ self removeSelfCommand execute
+]
+
 { #category : #'api - editing' }
-LeSnippet >> requestMergeWithBlock: aBlock [
-	"Request a merge between the receiver and the given block. 
+LeSnippet >> requestMergeWithSnippet: aSnippet [
+	"Request a merge between the receiver and the given snippet. 
 	As a result of the request depending on the implementation:
 	- nothing can happen if the merge is not accepted;
-	- the receiver is deleted and its content is added to the given block
-	- the given block is deleted amd its content is added to the receiver.
+	- the receiver is deleted and its content is added to the given snippet
+	- the given snippet is deleted amd its content is added to the receiver.
 	
-	One of the two blocks is returned to the caller."
+	One of the two snippets is returned to the caller."
 	
 	^ self subclassResponsibility
 ]
@@ -485,6 +687,16 @@ LeSnippet >> unindent [
 	If this is a first level snippet, do nothing"
 
 	self parent unindentSnippet: self.
+]
+
+{ #category : #'api - command building' }
+LeSnippet >> unindentCommand [
+	^ self commandBuilder unindentSnippetCommand
+]
+
+{ #category : #'api - command operations' }
+LeSnippet >> unindentThroughCommand [
+	^ self unindentCommand execute
 ]
 
 { #category : #installing }

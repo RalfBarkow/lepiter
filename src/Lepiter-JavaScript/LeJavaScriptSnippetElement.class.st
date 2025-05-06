@@ -16,15 +16,12 @@ LeJavaScriptSnippetElement >> onSnippetViewModelChanged [
 
 	self updateLanguageLabel.
 	self coder
-		jsLinkApplicationStrategy: self serverStrategy;
 		pharoBindings: self snippetViewModel snippetBindings
 ]
 
 { #category : #'instance creation' }
 LeJavaScriptSnippetElement >> serverStrategy [
-
-	^ serverStrategy ifNil: 
-		[ serverStrategy := LeJavaScriptApplicationGlobalStrategy new content: self ].
+	^ self coder jsLinkApplicationStrategy
 ]
 
 { #category : #private }
@@ -38,5 +35,5 @@ LeJavaScriptSnippetElement >> updateLanguageLabel [
 			<< serverAddress ipOrName;
 			<< ':';
 			print: serverAddress port ].
-	languageLabel text: (label asRopedText glamorousRegularFont foreground: BrGlamorousColors textMarkupColor).
+	languageElement text: (label asRopedText glamorousRegularFont foreground: BrGlamorousColors textMarkupColor).
 ]

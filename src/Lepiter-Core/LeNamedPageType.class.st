@@ -57,6 +57,14 @@ LeNamedPageType >> printOn: aStream [
 		print: title
 ]
 
+{ #category : #accessing }
+LeNamedPageType >> remoteLinkId [
+	"Answer the string to be used to identify the page in a remote link annotation ({{gtPage:...}})"
+	<return: #String>
+
+	^ title
+]
+
 { #category : #'api - testing' }
 LeNamedPageType >> saveEmptyPages [
 	"Flag whether to save empty pages or not.
@@ -79,5 +87,6 @@ LeNamedPageType >> title [
 { #category : #accessing }
 LeNamedPageType >> title: aString [
 	"Set the receiver's title"
+	aString isEmptyOrNil ifTrue: [ ^ LeUnnamedPageType page: self page ].
 	title := aString.
 ]

@@ -19,6 +19,11 @@ Class {
 	#category : #'Lepiter-GitHub-Client'
 }
 
+{ #category : #initialization }
+LeGitHubIssueUrlValidator >> beInvalid [
+	isValid := false
+]
+
 { #category : #'gt - extensions' }
 LeGitHubIssueUrlValidator >> gtOverviewFor: aView [
 	<gtView>
@@ -37,8 +42,8 @@ LeGitHubIssueUrlValidator >> gtOverviewFor: aView [
 						aStream nextPut: ('Project' -> self projectName).
 						aStream nextPut: ('Issue number' -> self issueNumber).
 						aStream nextPut: ('Identifier' -> self identifier) ] ] ];
-		column: 'Name' item: #key;
-		column: 'Value' item: [ :anAssoc |  anAssoc value ifNil: [ String empty ] ];
+		column: 'Name' text: #key;
+		column: 'Value' text: [ :anAssoc |  anAssoc value ifNil: [ String empty ] ];
 		send: #value
 ]
 
@@ -110,24 +115,23 @@ LeGitHubIssueUrlValidator >> url: anObject [
 { #category : #'api - validating' }
 LeGitHubIssueUrlValidator >> validate [
 	| anUrl anIssueNumber |
-	
 	isValid ifNotNil: [ ^ isValid ].
-	
-	anUrl := self url asZnUrl.
+
+	anUrl := [ self url asZnUrl ] on: Error do: [ ^ self beInvalid ].
 	isValid := true.
-	
-	anUrl scheme = 'https' ifFalse: [ isValid := false. ^ self ].
-	anUrl host = 'github.com' ifFalse: [ isValid := false. ^ self ].
-	anUrl pathSegments size = 4 ifFalse: [ isValid := false. ^ self ].
-	anUrl pathSegments third = 'issues' ifFalse: [ isValid := false. ^ self ].
-	
-	anIssueNumber := (NumberParser on: anUrl pathSegments fourth asString) 
-		failBlock: [ isValid := false. ^ self ];
-		nextNumber.	
-	anIssueNumber asString = anUrl pathSegments fourth ifFalse: [ isValid := false ].
-		
-	isValid ifFalse: [ ^ self ].
+
+	anUrl scheme = 'https' ifFalse: [ ^ self beInvalid ].
+	anUrl host = 'github.com' ifFalse: [ ^ self beInvalid ].
+	anUrl pathSegments size = 4 ifFalse: [ ^ self beInvalid ].
+	anUrl pathSegments third = 'issues' ifFalse: [ ^ self beInvalid ].
+
+	anIssueNumber := (NumberParser on: anUrl pathSegments fourth asString)
+			failBlock: [ ^ self beInvalid ];
+			nextNumber.
+	anIssueNumber asString = anUrl pathSegments fourth
+		ifFalse: [ ^ self beInvalid ].
+
 	ownerName := anUrl pathSegments at: 1.
 	projectName := anUrl pathSegments at: 2.
-	issueNumber := anUrl pathSegments at: 4.
+	issueNumber := anUrl pathSegments at: 4
 ]

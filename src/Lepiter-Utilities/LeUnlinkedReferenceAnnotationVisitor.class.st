@@ -1,8 +1,8 @@
 Class {
 	#name : #LeUnlinkedReferenceAnnotationVisitor,
 	#superclass : #Object,
-	#traits : 'TLeAnnotationParseNodeVisitor',
-	#classTraits : 'TLeAnnotationParseNodeVisitor classTrait',
+	#traits : 'TSmaCCComponentVisitor + (TLeAnnotationParseNodeVisitor - {#acceptNode:})',
+	#classTraits : 'TSmaCCComponentVisitor classTrait + TLeAnnotationParseNodeVisitor classTrait',
 	#instVars : [
 		'stream'
 	],

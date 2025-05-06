@@ -26,12 +26,22 @@ LeWordSnippet class >> contextMenuItemSpecification [
 	<leSnippetSpecification>
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'Word explanation'
+		title: self description
+]
+
+{ #category : #'api - accessing menu' }
+LeWordSnippet class >> description [
+	^ 'Word explanation'
 ]
 
 { #category : #factory }
 LeWordSnippet class >> empty [
 	^ self new
+]
+
+{ #category : #accessing }
+LeWordSnippet class >> explanationAttachmentFileName [
+	^ 'word-snippet-explanation.json'
 ]
 
 { #category : #'lepiter-store' }
@@ -64,6 +74,12 @@ LeWordSnippet class >> leJsonV4Name [
 	^ 'wordSnippet'
 ]
 
+{ #category : #visiting }
+LeWordSnippet >> acceptVisitor: aVisitor [
+
+	^ aVisitor visitWordSnippet: self
+]
+
 { #category : #'private - announcing' }
 LeWordSnippet >> announceExplanationChangedBy: aSource [
 	self notifyAnnouncement: (LeWordSnippetExplanationChangedAnnouncement new
@@ -87,14 +103,20 @@ LeWordSnippet >> asSnippetViewModel [
 ]
 
 { #category : #accessing }
-LeWordSnippet >> attachments [
-	^ {LeAttachment loadFromFolder: (self database 
-		resolveDbFile: (Path  *self explanationAttachmentName) parent pathString )}
+LeWordSnippet >> attachmentNames [
+	^ self explanationAttachmentName 
+		ifNotNil: [ :aName | {aName} ] 
+		ifNil: [ #() ]
 ]
 
-{ #category : #'api - accessing' }
+{ #category : #accessing }
 LeWordSnippet >> contentAsString [
-	^ self word
+	^ String
+		streamContents: [ :aStream | 
+			aStream
+				nextPutAll: (self explanation
+						ifNotNil: #word
+						ifNil: [ self word ifNotNil: #asString ifNil: [ '' ] ]) ]
 ]
 
 { #category : #'api - accessing' }
@@ -110,17 +132,24 @@ LeWordSnippet >> explanation: anExplanation [
 
 { #category : #'api - accessing' }
 LeWordSnippet >> explanation: anExplanation source: aSource [
-	self 
-		assert: [ anExplanation isNotNil ] 
-		description: [ 'Explanation must be non-nil' ].
 
-	explanation == anExplanation
-		ifTrue: [ ^ self ].
+	self
+		assert: [ anExplanation isNotNil ]
+		description: [ 'Explanation must be non-nil' ].
+	(explanation isNil or: [ explanation = anExplanation ]) ifTrue: [ 
+		explanation := anExplanation.
+		self updateCachedExplanationBy: aSource.
+		^ self ].
 
 	explanation := anExplanation.
 
 	self updateCachedExplanationBy: aSource.
-	self announceExplanationChangedBy: aSource.
+	self announceExplanationChangedBy: aSource
+]
+
+{ #category : #'private - updating' }
+LeWordSnippet >> explanationAttachmentFileName [
+	^ self class explanationAttachmentFileName
 ]
 
 { #category : #'api - accessing' }
@@ -162,8 +191,8 @@ LeWordSnippet >> gtViewAttachmentsFor: aView [
 		title: 'Attachments';
 		items: [ { self database 
 			resolveDbFile: (Path  *self explanationAttachmentName) parent pathString } ];
-		column: 'ID' item: #basename;
-		column: 'Name' item: [ :aDirectory | 
+		column: 'ID' text: #basename;
+		column: 'Name' text: [ :aDirectory | 
 			| allFiles |
 			allFiles := aDirectory files select: [ :aFile | 
 				aFile basename ~= LeAttachment basename ].
@@ -177,7 +206,7 @@ LeWordSnippet >> gtViewExplanationRawDataFor: aView [
 	<gtView>
 	explanation ifNil: [ ^ aView empty ].
 	^ (explanation gtRawDataFor: aView)
-		title: 'Explanation Raw Data' 
+		title: 'Explanation raw data' 
 ]
 
 { #category : #testing }
@@ -191,11 +220,16 @@ LeWordSnippet >> initialize [
 	word := ''.
 ]
 
-{ #category : #'api - testing' }
-LeWordSnippet >> isEmpty [
-	^ super isEmpty and: [ 
-		word isNil and: [ 
-			explanation isNil ] ]
+{ #category : #'private - exporting' }
+LeWordSnippet >> markdownOn: stream level: anInteger [
+	anInteger * 4 timesRepeat: [ stream nextPut: Character space ].
+	stream
+		<< '- ';
+		<< self contentAsString trimBoth.
+	self
+		childrenDo: [ :child | 
+			stream cr.
+			child markdownOn: stream level: anInteger + 1 ]
 ]
 
 { #category : #'api - accessing' }
@@ -219,9 +253,9 @@ LeWordSnippet >> readCachedExplanationBy: aSource [
 	LeStoreAttachmentReader new
 		database: self database;
 		attachmentName: self explanationAttachmentName;
-		reader: [ :aContent | 
+		reader: [ :aBinaryContent | 
 			| anArray |
-			anArray := STON fromString: aContent.
+			anArray := STON fromString: aBinaryContent utf8Decoded.
 			self 
 				explanation: (LeWordExplanation new 
 					word: anArray first;
@@ -230,18 +264,28 @@ LeWordSnippet >> readCachedExplanationBy: aSource [
 		read
 ]
 
+{ #category : #accessing }
+LeWordSnippet >> storeOn: aStream [
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new word: '.
+	self word storeOn: aStream.
+	aStream nextPutAll: '; explanation: '.
+	self explanation storeOn: aStream.
+	aStream nextPutAll: ')'
+]
+
 { #category : #'private - updating' }
 LeWordSnippet >> updateCachedExplanationBy: aSource [
 	LeStoreAttachmentWriter new
 		database: self database;
 		attachmentName: self explanationAttachmentName;
-		contentName: 'word-snippet-explanation.json';
-		content: [ STONJSON toString: (Array 
-			with: self explanation word
-			with: self explanation rawData) ];
-		writer: [ :anAttachmentName | 
-			self explanationAttachmentName: anAttachmentName source: aSource ];
-		write.
+		contentName: self explanationAttachmentFileName;
+		content: [ STONJSON
+				toString: (Array with: self explanation word with: self explanation rawData) ];
+		writer: [ :anAttachmentName | self explanationAttachmentName: anAttachmentName source: aSource ];
+		write
 ]
 
 { #category : #'api - accessing' }

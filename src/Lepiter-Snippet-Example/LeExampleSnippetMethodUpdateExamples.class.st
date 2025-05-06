@@ -1,10 +1,29 @@
 Class {
 	#name : #LeExampleSnippetMethodUpdateExamples,
-	#superclass : #LeSingleSnippetUpdateExamples,
+	#superclass : #LeExampleSnippeUpdateExamples,
 	#category : #'Lepiter-Snippet-Example-Examples'
 }
 
-{ #category : #'examples - snippets' }
+{ #category : #asserting }
+LeExampleSnippetMethodUpdateExamples >> assertModificationAnnouncements: anAnnouncementsCollection [
+
+	self assert: anAnnouncementsCollection size equals: 2.
+	
+	self 
+		assert: (anAnnouncementsCollection collect: #className) asArray 
+		equals: #(
+			LeExampleSnippetExampleBehaviorNameChanged
+			LeExampleSnippetExampleSelectorChanged).
+			
+	self 
+		assert: anAnnouncementsCollection first snippet exampleBehaviorName 
+		equals: #BlElementBoundsExamples.
+	self 
+		assert: anAnnouncementsCollection second snippet exampleSelector 
+		equals: #bounds.
+]
+
+{ #category : #asserting }
 LeExampleSnippetMethodUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 	self 
 		assert: targetSnippet exampleBehaviorName 
@@ -17,7 +36,8 @@ LeExampleSnippetMethodUpdateExamples >> assertSnippetModifiedFor: targetSnippet 
 { #category : #'examples - snippets' }
 LeExampleSnippetMethodUpdateExamples >> createTargetSnippet [
 	<gtExample>
-	^ LeExampleSnippet new 
+	<return: #LeExampleSnippet>
+	^ LeExampleSnippet new
 		exampleBehaviorName: 'BlBasicExamples';
 		exampleSelector: #circle
 ]

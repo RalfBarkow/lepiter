@@ -19,7 +19,7 @@ Class {
 		'currentDropdownContent',
 		'listElement',
 		'pageChanged',
-		'updateRequester'
+		'updater'
 	],
 	#category : #'Lepiter-Tool-UI'
 }
@@ -66,7 +66,8 @@ LeWorldStatusDropdown >> initialize [
 	self addInteractiveModelState: BrLayoutVerticalResizerModel fitContent.
 	
 	self initializeDropdownElement.
-	updateRequester := GtPhlowUpdateRequester new
+	updater := BrElementUpdater new
+		postponedDuration: 100 milliSeconds;
 		element: self selector: #updateContent.
 	
 	self addChild: self dropdownElement as: #dropdown.
@@ -80,7 +81,7 @@ LeWorldStatusDropdown >> initialize [
 LeWorldStatusDropdown >> initializeDropdownElement [
 	dropdownElement := self newButton
 		label: self tooltip;
-		addAptitude: (BrGlamorousWithDropdownAptitude
+		addAptitude: (BrGlamorousWithExplicitDropdownAptitude
 			handle: [ self newDropdownButton ]
 			content: [ self reusedDropdownContent ])
 ]
@@ -121,9 +122,8 @@ LeWorldStatusDropdown >> newDropdownButton [
 	^ BrButton new
 		icon: self statusIcon;
 		label: self tooltip;
-		aptitude: BrGlamorousButtonWithIconAptitude 
-			- BrGlamorousButtonWithLabelTooltipAptitude
-			- BrGlamorousButtonExteriorAptitude 
+		aptitude: BrGlamorousButtonWithIconAptitude - BrGlamorousButtonWithLabelTooltipAptitude2
+				- BrGlamorousButtonExteriorAptitude
 ]
 
 { #category : #'building widgets' }
@@ -165,6 +165,13 @@ LeWorldStatusDropdown >> onDatabaseChanged [
 ]
 
 { #category : #callbacks }
+LeWorldStatusDropdown >> onDatabaseMonitorUpdate [
+
+	pageChanged := self hasPendingChanges.
+	self updateWidget
+]
+
+{ #category : #callbacks }
 LeWorldStatusDropdown >> onDatabaseRemoved: anAnnouncement [ 
 	anAnnouncement database ifNotNil: [ :aKnowledgeBase |
 		aKnowledgeBase unsubscribe: self.
@@ -174,9 +181,16 @@ LeWorldStatusDropdown >> onDatabaseRemoved: anAnnouncement [
 				db monitor unsubscribe: self ] ]
 ]
 
-{ #category : #callbacks }
-LeWorldStatusDropdown >> onDbSaved [
+{ #category : #accessing }
+LeWorldStatusDropdown >> onDatabaseSaved [
+	"Deprecated: Allow existing dropdown instances to continue operating"
 
+	^ self onDatabaseMonitorUpdate
+]
+
+{ #category : #callbacks }
+LeWorldStatusDropdown >> onLogicalDatabaseReloaded [
+	
 	pageChanged := self hasPendingChanges.
 	self updateWidget
 ]
@@ -184,11 +198,10 @@ LeWorldStatusDropdown >> onDbSaved [
 { #category : #callbacks }
 LeWorldStatusDropdown >> onPageChanged: anAnnouncement [ 
 
-	pageChanged ifTrue: 
-		[ ^ self ].
+	pageChanged ifTrue: [ ^ self ].
 	pageChanged := true.
 	self updateWidget.
-	StringSignal emit: 'set page changed'.
+
 ]
 
 { #category : #private }
@@ -199,18 +212,20 @@ LeWorldStatusDropdown >> registerDatabaseEvents [
 		database weak when: LeDatabasePageAdded send: #onPageChanged: to: self.
 		database weak when: LeDatabasePageRemoved send: #onPageChanged: to: self.
 		database weak when: LePageTitleChanged send: #onPageChanged: to: self.
+		
+		database weak when: LeLogicalDatabaseReloaded send: #onLogicalDatabaseReloaded to: self.
 		self databases
 			select: [ :db | db monitor isNotNil ]
 			thenDo: [ :db |
 				db monitor weak
-					when: LeLocalStoreMonitorSaved 
-					send: #onDbSaved 
+					when: LeStoreMonitorAnnouncement
+					send: #onDatabaseMonitorUpdate 
 					to: self ] ].
 ]
 
 { #category : #updating }
 LeWorldStatusDropdown >> requestUpdate [
-	self updateRequester ifNotNil: [ :anUpdateRequester | 
+	self updater ifNotNil: [ :anUpdateRequester | 
 		anUpdateRequester requestUpdate ]
 ]
 
@@ -246,16 +261,11 @@ LeWorldStatusDropdown >> updateContent [
 	currentDropdownContent addChild: self newDropdownContent.
 ]
 
-{ #category : #accessing }
-LeWorldStatusDropdown >> updateRequester [
-	^ updateRequester
-]
-
 { #category : #updating }
 LeWorldStatusDropdown >> updateStatus [
 
-	dropdownElement enqueueTask: 
-		(BlTaskAction new action: [ dropdownElement icon: self statusIcon ]).
+	dropdownElement enqueueTask: (BlTaskAction new 
+		action: [ dropdownElement icon: self statusIcon ]).
 
 ]
 
@@ -263,4 +273,9 @@ LeWorldStatusDropdown >> updateStatus [
 LeWorldStatusDropdown >> updateWidget [
 	self updateStatus.
 	self requestUpdate.
+]
+
+{ #category : #accessing }
+LeWorldStatusDropdown >> updater [
+	^ updater
 ]

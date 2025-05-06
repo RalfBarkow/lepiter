@@ -28,7 +28,7 @@ LeBubblingPropagater >> parents: aLeContent do: aBlock [
 	aParent := aLeContent parent.
 	[ aParent isNotNil ] whileTrue: [ 
 		aBlock cull: aParent.
-		aParent := aParent parent ].
+		aParent := aParent parent ]
 ]
 
 { #category : #'api - promoting' }

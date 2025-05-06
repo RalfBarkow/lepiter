@@ -12,8 +12,8 @@ When maximized, I display a sidebar:
 Class {
 	#name : #LePageToolElement,
 	#superclass : #BlElement,
-	#traits : 'TGtPhlowToolDetailAdjustable + TLeWithPageViewModel + TBrLayoutResizable',
-	#classTraits : 'TGtPhlowToolDetailAdjustable classTrait + TLeWithPageViewModel classTrait + TBrLayoutResizable classTrait',
+	#traits : 'TGtPhlowToolDetailAdjustable + TLeWithPageViewModel + TBrLayoutResizable + TGtPagerPageInstantiator',
+	#classTraits : 'TGtPhlowToolDetailAdjustable classTrait + TLeWithPageViewModel classTrait + TBrLayoutResizable classTrait + TGtPagerPageInstantiator classTrait',
 	#instVars : [
 		'sidebarElement',
 		'contentElement',
@@ -27,6 +27,17 @@ LePageToolElement >> contentElement [
 	^ contentElement
 ]
 
+{ #category : #'private - updating' }
+LePageToolElement >> hideContentElementWithOriginalDatabase: aLeDatabase [
+	"See https://github.com/feenkcom/gtoolkit/issues/4186"
+
+	contentElement parent == self ifFalse: [ ^ self ].
+	self
+		replaceChild: contentElement
+		with: (self newEmptyPageWithOriginalDatabase: aLeDatabase)
+		as: #content
+]
+
 { #category : #initialization }
 LePageToolElement >> initialize [
 	super initialize.
@@ -34,25 +45,26 @@ LePageToolElement >> initialize [
 	self initializeContentElement.
 	self initializeTitleNotifier.
 	self layout: BlLinearLayout horizontal.
-	self addInteractiveModelState: GtPhlowToolDetailModel new.
 	
 	self addChild: self sidebarElement as: #sidebar.
 	self addChild: self contentElement as: #content.
-	self addAptitude: BrLayoutResizerAptitude inherit.
+	
 	self addAptitude: (GtPhlowToolDetailAptitude new
-		normal: [ self onNormalVolume ];
-		detailed: [ self onDetailedVolume ]).
-	self addEventHandlerOn: BlClickEvent do: [ :anEvent | self requestFocus ].
+		normal: [ :aStyle | aStyle do: [ self onNormalVolume ] ];
+		detailed: [ :aStyle | aStyle do: [ self onDetailedVolume ] ]).
+
+	self beFocusable.
+	self when: BlClickEvent do: [ :anEvent | self requestFocus ].
+	self phlow 
+		accessTool: (GtPhlowToolClassType forClass: LePage) 
+		viewModel: #pageViewModel 
+		object: #pageModel.
 ]
 
 { #category : #initialization }
 LePageToolElement >> initializeContentElement [
 	contentElement := LePageToolContentTreeElement new
-		withTitleAndRemoveAction;
-		padding: (BlInsets top: 0 right: 10 bottom: 0 left: 10).
-	"contentElement := LePageToolContentCanvasElement new
-		withTitleAndRemoveAction;
-		padding: (BlInsets top: 0 right: 10 bottom: 0 left: 10)."
+		padding: (BlInsets top: 0 right: 10 bottom: 0 left: 10)
 ]
 
 { #category : #initialization }
@@ -68,6 +80,22 @@ LePageToolElement >> initializeTitleNotifier [
 		longLabel: [ self pageViewModel pageTitle ];
 		icon: LeIcons lepiterPage).
 	self addEventHandler: titleNotifier.
+]
+
+{ #category : #'private - updating' }
+LePageToolElement >> newEmptyPageWithOriginalDatabase: aLeDatabase [
+	| aText |
+	aText := aLeDatabase hasChildren
+			ifTrue: [ 'No page selected' ]
+			ifFalse: [ 'Empty knowledgebase' ].
+	^ BrFrame new
+		matchParent;
+		addChild: (BrLabel new
+				aptitude: (BrGlamorousLabelAptitude new foreground: self theme button disabledTextColor);
+				text: aText;
+				constraintsDo: [ :c | 
+					c frame horizontal alignCenter.
+					c frame vertical alignCenter ])
 ]
 
 { #category : #'private - event handling' }
@@ -95,6 +123,13 @@ LePageToolElement >> onPageModelReplaced [
 ]
 
 { #category : #'private - event handling' }
+LePageToolElement >> onPageRemoved: anAnnouncement [
+	BlTaskAction
+		enqueueElement: self
+		action: [ self hideContentElementWithOriginalDatabase: anAnnouncement originalDatabase ]
+]
+
+{ #category : #'private - event handling' }
 LePageToolElement >> onPageTitleChanged [
 	self updateWorldTitle
 ]
@@ -102,14 +137,18 @@ LePageToolElement >> onPageTitleChanged [
 { #category : #'api - page view model' }
 LePageToolElement >> onPageViewModelChanged [
 	"Is sent when a new page view model is assigned to the element"
-	
+
 	self contentElement pageViewModel: self pageViewModel.
 
-	self sidebarElement
-		databaseViewModel: self pageViewModel databaseViewModel;
-		selection: self pageViewModel.
+	self
+		enqueueTask: (BlTaskAction new
+				action: [ 
+					self showContentElement.
+					self sidebarElement
+						databaseViewModel: self pageViewModel databaseViewModel;
+						selection: self pageViewModel.
 
-	self updateWorldTitle
+					self updateWorldTitle ])
 ]
 
 { #category : #'private - event handling' }
@@ -120,9 +159,30 @@ LePageToolElement >> onSidebarChangePageWish: aWish [
 	self pageViewModel: aWish pageUIModel
 ]
 
+{ #category : #'api - page model' }
+LePageToolElement >> pageModel [
+	self hasPage ifFalse: [ ^ nil ].
+	^ self pageViewModel pageModel
+]
+
 { #category : #'api - accessing' }
 LePageToolElement >> selectionTransformation: aBlock [
 	self contentElement selectionTransformation: aBlock
+]
+
+{ #category : #'private - updating' }
+LePageToolElement >> showContentElement [
+	"See https://github.com/feenkcom/gtoolkit/issues/4186"
+
+	| anId |
+	contentElement parent == self ifTrue: [ ^ self ].
+	anId := #content asBlocElementId.
+	self children
+		detect: [ :each | each id = anId ]
+		ifFound: [ :anElement | anElement removeFromParent ]
+		ifNone: [ "ignore" ].
+
+	self addChild: contentElement as: anId
 ]
 
 { #category : #'private - accessing' }
@@ -139,12 +199,8 @@ LePageToolElement >> subscribeToPageViewModel [
 	self pageViewModel weak 
 		when: LePageViewModelTitleChanged send: #onPageTitleChanged to: self;
 		when: LePageViewModelPageReplaced send: #onPageModelReplaced to: self;
-		when: LePageViewModelDatabaseChanged send: #onPageDatabaseChanged to: self
-]
-
-{ #category : #'private - accessing' }
-LePageToolElement >> tabLabelChanger [
-	^ titleNotifier
+		when: LePageViewModelDatabaseChanged send: #onPageDatabaseChanged to: self;
+		when: LePageViewModelPageRemoved send: #onPageRemoved: to: self.
 ]
 
 { #category : #'private - accessing' }

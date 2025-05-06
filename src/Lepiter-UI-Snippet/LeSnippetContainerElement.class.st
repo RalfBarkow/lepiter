@@ -19,7 +19,7 @@ LeSnippetContainerElement >> initialize [
 	super initialize.
 	
 	self hMatchParent.
-	self vFitContent.
+	self vFitContentLimited.
 	
 	self layout: BlFrameLayout new.
 	self clipChildren: false.

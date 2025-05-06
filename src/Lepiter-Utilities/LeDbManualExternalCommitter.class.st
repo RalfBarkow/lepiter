@@ -43,7 +43,7 @@ LeDbManualExternalCommitter >> addAllFiles: dbDir [
 	| proc |
 
 	self appendToOuputStreams: 'Add All Files:'.
-	proc := (GtUnixSubprocess
+	proc := (GtSubprocessWithInMemoryOutput
 		command: 'git'
 		arguments: { 'add'. '*' })
 		workingDirectory: dbDir.
@@ -100,7 +100,7 @@ LeDbManualExternalCommitter >> commit: dbDir [
 	| proc |
 
 	self appendToOuputStreams: 'Commit: '.
-	proc := (GtUnixSubprocess
+	proc := (GtSubprocessWithInMemoryOutput
 		command: 'git'
 		arguments: { 'commit'. '-m'. DateAndTime now printToMinute. })
 		workingDirectory: dbDir.
@@ -200,7 +200,7 @@ LeDbManualExternalCommitter >> status: dbDir [
 	| proc |
 
 	self appendToOuputStreams: 'Status:'.
-	proc := (GtUnixSubprocess
+	proc := (GtSubprocessWithInMemoryOutput
 		command: 'git'
 		arguments: { 'status'. })
 		workingDirectory: dbDir.
@@ -217,7 +217,7 @@ LeDbManualExternalCommitter >> sync: dbDir [
 
 	self appendToOuputStreams: 'Sync:'.
 	syncCommand ifNil: [ ^ self ].
-	proc := (GtUnixSubprocess
+	proc := (GtSubprocessWithInMemoryOutput
 		command: syncCommand
 		arguments: #())
 		workingDirectory: dbDir.

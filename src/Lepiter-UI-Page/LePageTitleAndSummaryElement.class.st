@@ -44,29 +44,10 @@ LePageTitleAndSummaryElement >> emailElement [
 LePageTitleAndSummaryElement >> initialize [
 	super initialize.
 	self initializeTitleElement.
-"	self initializeDateAndEmailElement.
-	self initializeDateElement.
-	self initializeEmailElement."
 	self layout: BlLinearLayout horizontal.
-	
 	self addChild: self titleElement as: #title.
 	self addChild: self summaryElement as: #summary.
-"	self addChild: self dateAndEmailElement as: #dateAndEmail.
-	self dateAndEmailElement addChild: self dateElement as: #date.
-	self dateAndEmailElement addChild: self emailElement as: #email.
-	
-	self addAptitude: (BrLayoutResizerAptitude new
-		hInherit;
-		vAnyToFitContent; 
-		hInherit: self titleElement;
-		vAnyToFitContent: self titleElement;
-		hInherit: self dateAndEmailElement;
-		vAnyToFitContent: self dateAndEmailElement;
-		hInherit: self dateElement;
-		vAnyToFitContent: self dateElement;
-		hInherit: self emailElement;
-		vAnyToFitContent: self emailElement)."
-
+	self initializeListeners
 ]
 
 { #category : #initialization }
@@ -90,6 +71,36 @@ LePageTitleAndSummaryElement >> initializeEmailElement [
 		aptitude: (BrGlamorousLabelAptitude new glamorousRegularFont; foreground: Color gray);
 		hMatchParent;
 		vFitContent
+]
+
+{ #category : #initialization }
+LePageTitleAndSummaryElement >> initializeListeners [
+	self
+		when: BlClickEvent
+		do: [ :anEvent | 
+			anEvent modifiers isPrimaryModifier
+				ifTrue: [ | aTool aSpace |
+					aTool := self pageViewModel asPhlowTool.
+					aSpace := BlSpace new.
+					aSpace title: self gtDisplayString.
+					aSpace icon: aTool icon.
+					aSpace extent: 1200 @ 600.
+					aSpace root background: Color transparent.
+					aSpace
+						addChild: (GtPager
+								createOn: (GtPagerWrapperElement new
+										tool: aTool;
+										embellisher: (GtPagerPageEmbellisher new extension: GtPagerPageEmbellisherExtension null))) maximized.
+					aSpace withHalos.
+					self showSpace: aSpace ] ].
+	self
+		when: BlMouseEnterEvent
+		do: [ :anEvent | 
+			anEvent consumed: true.
+			anEvent modifiers isPrimaryModifier
+				ifTrue: [ anEvent target mouseCursor: BlCopyCursor new ]
+				ifFalse: [ anEvent target mouseCursor: nil ].
+			anEvent target requestFocus ]
 ]
 
 { #category : #initialization }

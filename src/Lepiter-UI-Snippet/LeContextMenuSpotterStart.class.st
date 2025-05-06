@@ -22,19 +22,22 @@ LeContextMenuSpotterStart >> database: anObject [
 ]
 
 { #category : #printing }
-LeContextMenuSpotterStart >> gtDisplayString [
-	^ 'New snippet'
+LeContextMenuSpotterStart >> gtDisplayOn: aStream [
+	aStream nextPutAll: 'Add new snippet'
 ]
 
 { #category : #searching }
-LeContextMenuSpotterStart >> gtSpotterForNewSnippetFor: aStep [
+LeContextMenuSpotterStart >> gtNewSnippetFor: aSearch [
 	<gtSearch>
-	aStep listProcessor
+	
+	^ aSearch list
+		title: 'Add page with snippet';
 		priority: 1;
-		allCandidates: [ LeContextMenuBuilder new build ];
-		title: 'Snippet type';
+		items: [ LeContextMenuSnippetItemsCollector new 
+			collectMenuItems ];
 		itemName: #title;
-		filter: GtFilterSubstring;
-		keyBinding: $s meta;
+		filterBySubstring;
+		withoutCategoryAction;
+		withoutItemsLimit;
 		wantsToDisplayOnEmptyQuery: true
 ]

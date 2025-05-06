@@ -13,6 +13,26 @@ Class {
 	#category : #'Lepiter-Store-JsonV4'
 }
 
+{ #category : #private }
+LeJsonV4000Updater class >> cleanUidString: aString [
+	"Come up with a deterministic and (hopefully) unique UID by replacing any characters which aren't part of the base64 alphabet and extending the string by repeating the first part until it is a valid length."
+	| alphabet uidString uid |
+
+	uidString := aString.
+	self assert: (uidString size between: 3 and: 24).
+	alphabet := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.
+	uidString doWithIndex: [ :ch :index |
+		(alphabet includes: ch) ifFalse: 
+			[ uidString := uidString 
+				copyReplaceFrom: index 
+				to: index 
+				with: (alphabet at: (ch codePoint \\ (alphabet size + 1))) asString ] ].
+	(uidString size \\ 4) = 0 ifFalse:
+		[ uidString := uidString, (uidString copyFrom: 1 to: (4 - (uidString size \\ 4))) ].
+	uid := UUID fromBase64EncodedString: uidString.
+	^ uid base64Encoded.
+]
+
 { #category : #'private - accessing' }
 LeJsonV4000Updater class >> minorVersion [ 
 	"Answer the minor version number that this class upgrades from"
@@ -22,20 +42,7 @@ LeJsonV4000Updater class >> minorVersion [
 
 { #category : #private }
 LeJsonV4000Updater >> cleanUidString: aString [
-	"Come up with a deterministic and (hopefully) unique UID by replacing any characters which aren't part of the base64 alphabet and extending the string by repeating the first part until it is a valid length."
-	| alphabet uidString uid |
-
-	uidString := aString.
-	self assert: (uidString size between: 3 and: 24).
-	alphabet := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.
-	uidString doWithIndex: [ :ch :index |
-		(alphabet includes: ch) ifFalse: 
-			[ uidString at: index put: (alphabet at: (ch codePoint \\ (alphabet size + 1))) ] ].
-	(uidString size \\ 4) = 0 ifFalse:
-		[ uidString := uidString, (uidString copyFrom: 1 to: (4 - (uidString size \\ 4))) ].
-	uid := UUID nilUUID.
-	ZnBase64Encoder new decode: uidString readStream to: uid writeStream.
-	^ uid base64Encoded.
+	^ self class cleanUidString: aString
 ]
 
 { #category : #private }

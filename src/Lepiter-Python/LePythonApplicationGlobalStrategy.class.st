@@ -12,10 +12,10 @@ LePythonApplicationGlobalStrategy class >> strategyName [
 
 { #category : #accessing }
 LePythonApplicationGlobalStrategy >> applicationServer [
-
-	content database isDatabase ifFalse: [ ^ nil ].
-	PBApplication isRunning ifFalse:
-		[ PBApplication uniqueInstance: (self newPbApplicationFor: content database) ].
+	PBApplication isRunning
+		ifFalse: [ 
+			PBApplication uniqueInstance
+				ifNil: [ PBApplication uniqueInstance: (self newPbApplicationFor: content database) ] ].
 	^ PBApplication uniqueInstance
 ]
 
@@ -24,8 +24,7 @@ LePythonApplicationGlobalStrategy >> applicationSettings [
 	"Answer the settings that will be used by the server.
 	This musn't actually start the server as that should be deferred until a snippet is evaluated for the first time."
 
-	^ PBApplication isRunning ifTrue:
-		[ PBApplication uniqueInstance settings ]
-	ifFalse:
-		[ self updatedSettings: PBApplication new settings ]
+	^ PBApplication isRunning
+		ifTrue: [ PBApplication uniqueInstance settings ]
+		ifFalse: [ self updatedSettings: PBApplication new settings ]
 ]

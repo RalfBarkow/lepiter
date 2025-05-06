@@ -1,6 +1,6 @@
 Class {
 	#name : #LeTableOfContentsRestNode,
-	#superclass : #Object,
+	#superclass : #LeAbstractTableOfContentsNode,
 	#instVars : [
 		'page',
 		'rootNode',
@@ -19,32 +19,20 @@ LeTableOfContentsRestNode >> children: anObject [
 	children := anObject
 ]
 
-{ #category : #'gt-extension' }
-LeTableOfContentsRestNode >> gtChildrenFor: aView [
-	<gtView>
-
-	^ aView tree
-		title: 'Children';
-		priority: 50;
-		items: [ self children ];
-		children: #children
-]
-
-{ #category : #'gt-extension' }
-LeTableOfContentsRestNode >> gtLiveFor: aView [
-	<gtView>
-	self page ifNil: [ ^ aView empty ].
-	^ aView forward
-		title: 'Live';
-		priority: 1;
-		object: [ self page ];
-		view: #gtLiveFor:
+{ #category : #accessing }
+LeTableOfContentsRestNode >> gtDisplayOn: stream [
+	stream nextPutAll: 'Unclassified pages'
 ]
 
 { #category : #initialization }
 LeTableOfContentsRestNode >> initialize [
 	super initialize.
 	children := #().
+]
+
+{ #category : #accessing }
+LeTableOfContentsRestNode >> isForPage [
+	^ false
 ]
 
 { #category : #testing }
@@ -61,18 +49,6 @@ LeTableOfContentsRestNode >> page [
 { #category : #accessing }
 LeTableOfContentsRestNode >> page: aPage [
 	page := LeRestPage new page: aPage; node: self
-]
-
-{ #category : #printing }
-LeTableOfContentsRestNode >> printOn: aStream [
-
-	aStream
-		nextPutAll: 'ToC: Other pages';
-		space;
-		nextPut: $(;
-		print: children size;
-		nextPutAll: ' pages';
-		nextPut: $).
 ]
 
 { #category : #accessing }

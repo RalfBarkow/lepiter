@@ -29,5 +29,6 @@ LeDatabasePropagater >> propagate: anAnnouncement in: aLeContent [
 	aLeContent database
 		ifNil: [ ^ anAnnouncement ].
 	
-	^ LeLocalPropagater default propagate: anAnnouncement in: aLeContent database.
+	^ LeLocalPropagater default 
+		propagate: anAnnouncement in: aLeContent database
 ]

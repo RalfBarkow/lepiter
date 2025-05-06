@@ -13,7 +13,12 @@ LeChangesSnippet class >> contextMenuItemSpecification [
 	<leSnippetSpecification>
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'Changes'
+		title: self description
+]
+
+{ #category : #'api - accessing menu' }
+LeChangesSnippet class >> description [
+	^ 'Changes'
 ]
 
 { #category : #factory }
@@ -36,6 +41,12 @@ LeChangesSnippet class >> leJsonV4AttributeMapping [
 LeChangesSnippet class >> leJsonV4Name [
 
 	^ 'changesSnippet'
+]
+
+{ #category : #visiting }
+LeChangesSnippet >> acceptVisitor: aVisitor [
+
+	^ aVisitor visitChangesSnippet: self
 ]
 
 { #category : #converting }
@@ -107,9 +118,22 @@ LeChangesSnippet >> initialize [
 	previewHeight := 200
 ]
 
-{ #category : #'api - testing' }
-LeChangesSnippet >> isEmpty [
-	^ self fileName isNil
+{ #category : #'private - exporting' }
+LeChangesSnippet >> markdownOn: stream level: anInteger [
+	"Here we should inline the ombu file."
+
+	anInteger * 4 timesRepeat: [ stream nextPut: Character space ].
+	stream
+		cr;
+		<< '```';
+		cr;
+		<< self contentAsString trimBoth;
+		<< '```';
+		cr.
+	self
+		childrenDo: [ :child | 
+			stream cr.
+			child markdownOn: stream level: anInteger + 1 ]
 ]
 
 { #category : #'api - file name' }
@@ -190,6 +214,17 @@ LeChangesSnippet >> previewHeight: aNewPreviewHeight [
 	previewHeight := aNewPreviewHeight.
 	self onNewPreviewHeightSet: aNewPreviewHeight.
 	self notifyPreviewHeightChanged
+]
+
+{ #category : #printing }
+LeChangesSnippet >> storeOn: aStream [
+
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new fileName:'.
+	self fileName storeOn: aStream.
+	aStream nextPut: $)
 ]
 
 { #category : #'api - file name' }

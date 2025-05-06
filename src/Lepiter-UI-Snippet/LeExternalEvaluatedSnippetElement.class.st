@@ -8,10 +8,10 @@ Class {
 	#instVars : [
 		'snippetBindings',
 		'coderModel',
-		'languageLabel',
-		'serverStrategy',
 		'server',
-		'serverException'
+		'serverException',
+		'languageElement',
+		'contentElement'
 	],
 	#category : #'Lepiter-UI-Snippet-! Views'
 }
@@ -21,20 +21,9 @@ LeExternalEvaluatedSnippetElement class >> isAbstract [
 	^ self = LeExternalEvaluatedSnippetElement
 ]
 
-{ #category : #'private - execution' }
-LeExternalEvaluatedSnippetElement >> executeContents [
-	"Execute the receiver's contents"
-
-	self coderViewModel doItAll
-]
-
-{ #category : #'private - execution' }
-LeExternalEvaluatedSnippetElement >> executeContentsAndSpawnFrom: anElement [
-	"Execute the receiver's contents and spawn the result"
-
-	self database isDatabase ifFalse:
-		[ self error: 'Unable to execute - no database ' ].
-	self coderViewModel doItAndGo
+{ #category : #initialization }
+LeExternalEvaluatedSnippetElement >> coderEditorElementClass [
+	^ GtSourceCoderEditorElement
 ]
 
 { #category : #initialization }
@@ -44,67 +33,42 @@ LeExternalEvaluatedSnippetElement >> initialize [
 	self initializeTextEditor.
 	self initializeCoderToolbar.
 	self initializeSpawnDownElements.
+	
+	languageElement := self initializeLanguageElement.
+	languageElement constraintsDo: [ :c |
+		c frame horizontal alignRight.
+		c frame vertical alignTop ].
+	
+	contentElement := BrFrame new
+		hMatchParent;
+		vFitContent;
+		addChildren: { editorElement. languageElement}.
 
 	self registerSpawnBelowHandler
 ]
 
 { #category : #initialization }
-LeExternalEvaluatedSnippetElement >> initializeCoderToolbar [
-	"Initialise the toolbar that contains the control buttons (doIt, doIt and inspect)"
-	| buttonBar toolbar |
+LeExternalEvaluatedSnippetElement >> initializeLanguageElement [
+	"Initialise the element that displays the language and connection details.
+	This is normally a text element, but subclasses may replace it with something else, e.g. a button"
 
-	buttonBar := BrHorizontalPane new matchParent preventMouseEvents.
-	buttonBar
-		vFitContent;
-		hMatchParent;
-		zIndex: 1000.
-
-	buttonBar addChild: (BrButton new 
-		beTinySize;
-		aptitude: BrGlamorousButtonWithIconAptitude;
-		icon: BrGlamorousVectorIcons play;
-		label: #Evaluate;
-		action: [ :aButton | self executeContents ]) as: #executeButton.
-	buttonBar addChild: (BrButton new 
-		beTinySize;
-		aptitude: BrGlamorousButtonWithIconAptitude;
-		icon: BrGlamorousVectorIcons playinspect;
-		label: #Inspect;
-		action: [ :aButton | self executeContentsAndSpawnFrom: aButton ]) as: #executeAndSpawnButton.
-
-	languageLabel := BlAttributedTextElement new
-		glamorousRegularSmallSize;
-		text: ('<unknown>' asRopedText foreground: BrGlamorousColors textMarkupColor);
-		padding: (BlInsets top: 5 left: 5 bottom: 0 right: 30);
-		constraintsDo: [ :c |
-			c vertical matchParent.
-			c horizontal fitContent. ].
-
-	toolbar := BrHorizontalPane new matchParent preventMouseEvents.
-	toolbar
-		vFitContent;
-		hMatchParent;
-		addChild: buttonBar;
-		addChild: languageLabel.
-
-	coderToolbar := BrHorizontalPane new
-		vFitContent;
-		hMatchParent;
-		alignBottomLeft;
-		addChild: toolbar.
-
-	spawnDestinationLook := GtSourceCoderSpawnDestinationAptitude new.
-	coderToolbar addAptitude: spawnDestinationLook.
-
+	^ BrLabel new
+		aptitude: (BrGlamorousLabelAptitude new glamorousRegularSmallSize
+		foreground: BrGlamorousColors textMarkupColor);
+		margin: (BlInsets top: 5 right: 5);
+		text: '<unknown>'
 ]
 
 { #category : #initialization }
 LeExternalEvaluatedSnippetElement >> initializeTextEditor [
 
-	editorElement := GtSourceCoderEditorElement new 
+	editorElement := self coderEditorElementClass new 
 		padding: (BlInsets top: 5 left: 5 bottom: 5 right: 0).
 
-	editorElement editor addEventHandler: (LeEditorReachedBorderEventHandler new snippetElement: self)
+	editorElement editor 
+		addEventHandler: (LeEditorReachedBorderEventHandler new 
+			snippetElement: self);
+		ensureNoUndoRedoShortcuts
 ]
 
 { #category : #initialization }
@@ -119,9 +83,9 @@ LeExternalEvaluatedSnippetElement >> initializeTextEditorShortcuts [
 		"Delete next character, or merge with following snippet"
 		addEditorShortcut: (LeSnippetDeleteNextShortcut new combination: (self keyboardShortcut: #DeleteNext));
 		"New Line in LeSnippet"
-		addEditorShortcut: (BrEditorLineEndingShortcut new combination: (self keyboardShortcut: #NewLine));
+		addEditorShortcut: (BrEditorShortcut lineEnding combination: (self keyboardShortcut: #NewLine));
 		"Lose focus LeSnippet"
-		addEditorShortcut: (BrEditorLoseFocusShortcut new combination: (self keyboardShortcut: #LoseFocus));
+		addEditorShortcut: (BrEditorShortcut loseFocus combination: (self keyboardShortcut: #LoseFocus));
 		"Indent LeSnippet"
 		addEditorShortcut: (LeSnippetIndentSnippetShortcut new combination: (self keyboardShortcut: #IndentSnippet));
 		"Unindent LeSnippet"
@@ -138,16 +102,21 @@ LeExternalEvaluatedSnippetElement >> initializeTextEditorShortcuts [
 LeExternalEvaluatedSnippetElement >> registerSpawnBelowHandler [
 	self
 		when: GtPhlowObjectToSpawn
-		do: [ :aSpawnEvent |
-			(aSpawnEvent spawnDestination isSpawnBelow and:
-			[ (aSpawnEvent properties includesKey: #spawnContainer) not ]) ifTrue: [ 
-				aSpawnEvent consumed: true. 
-				self fireEvent: (GtPhlowObjectToSpawn new 
-					previousSpawnEvent: aSpawnEvent;
-					tool: aSpawnEvent tool; 
-					sourceElement: aSpawnEvent currentTarget;
-					spawnDestination: aSpawnEvent spawnDestination;
-					in: [ :anNewEvent | 
-						anNewEvent propertyAt: #spawnContainer put: self ];
-					yourself) ] ].
+		do: [ :aSpawnEvent | 
+			(aSpawnEvent spawnDestination isSpawnBelow
+				and: [ aSpawnEvent spawnContainer isNil ])
+				ifTrue: [ self
+						fireEvent: (GtPhlowObjectToSpawn new
+								fromPreviousSpawnEvent: aSpawnEvent;
+								spawnContainer: self) ] ]
+]
+
+{ #category : #accessing }
+LeExternalEvaluatedSnippetElement >> serverStrategy [
+	^ self subclassResponsibility
+]
+
+{ #category : #accessing }
+LeExternalEvaluatedSnippetElement >> snippetContent [
+	^ contentElement
 ]

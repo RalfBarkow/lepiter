@@ -17,6 +17,15 @@ Class {
 }
 
 { #category : #accessing }
+LeWordDefinition >> = anObject [
+
+	^ (anObject isKindOf: LeWordDefinition) and: [ 
+		  anObject definition = self definition and: [ 
+			  anObject partOfSpeech = self partOfSpeech and: [ 
+				  anObject exampleSentence = self exampleSentence ] ] ]
+]
+
+{ #category : #accessing }
 LeWordDefinition >> definition [
 	^ rawData at: 'definition'
 ]

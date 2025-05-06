@@ -1,12 +1,21 @@
 Class {
 	#name : #LeLocalStoreLoad,
 	#superclass : #LeLocalStore,
+	#traits : 'TGtMacroFileReferenceEncoding',
+	#classTraits : 'TGtMacroFileReferenceEncoding classTrait',
 	#instVars : [
 		'duplicates',
 		'corrupted'
 	],
 	#category : #'Lepiter-Store-LocalJSON-Store'
 }
+
+{ #category : #testing }
+LeLocalStoreLoad class >> loadsDatabaseUrl: aDatabaseZnUrl [
+	"Answer a boolean indicating whether the receiver can load the supplied URL"
+
+	^ aDatabaseZnUrl scheme = #file
+]
 
 { #category : #accessing }
 LeLocalStoreLoad >> corrupted [
@@ -19,7 +28,7 @@ LeLocalStoreLoad >> duplicates [
 ]
 
 { #category : #testing }
-LeLocalStoreLoad >> hasCorruptedFiles [
+LeLocalStoreLoad >> hasCorruptedPages [
 	"Answer a boolean indicating whether any corrupted files were found.
 	Only valid after loading the DB."
 
@@ -27,7 +36,7 @@ LeLocalStoreLoad >> hasCorruptedFiles [
 ]
 
 { #category : #testing }
-LeLocalStoreLoad >> hasDuplicateFiles [
+LeLocalStoreLoad >> hasDuplicatePages [
 	"Answer a boolean indicating whether any duplicate files were found.
 	Only valid after loading the DB."
 
@@ -43,11 +52,11 @@ LeLocalStoreLoad >> initialize [
 ]
 
 { #category : #loading }
-LeLocalStoreLoad >> loadAndMonitorFrom: aFileReference [
+LeLocalStoreLoad >> loadAndMonitorFrom: aZnUrl [
 	"Answer a LeLocalJSONStoreMonitor with its database loaded from the page files in aFileReference (directory)"
 
 	^ self
-		localRoot: aFileReference;
+		localRoot: aZnUrl asLepiterFileReference;
 		loadAndMonitorWithDelay: nil
 ]
 
@@ -58,6 +67,16 @@ LeLocalStoreLoad >> loadAndMonitorFrom: aFileReference saveDelay: aDuration [
 	^ self
 		localRoot: aFileReference;
 		loadAndMonitorWithDelay: aDuration
+]
+
+{ #category : #loading }
+LeLocalStoreLoad >> loadAndMonitorFromUrl: aZnUrl [
+	"Answer a LeLocalJSONStoreMonitor with its database loaded from the page files in the specified directory with the default save delay"
+
+	self assert: aZnUrl isFile.
+	^ self
+		localRoot: (self decodeFileReferenceString: aZnUrl path);
+		loadAndMonitorWithDelay: nil
 ]
 
 { #category : #loading }
@@ -93,7 +112,7 @@ LeLocalStoreLoad >> loadContentInDatabase: aDatabase [
 	self assert: [ aDatabase explicitLinks uid isNil ].
 	
 	pages := self loadPagesIn: localRoot.
-	explicitLinks := self loadExplicitLinksIn: localRoot.
+	explicitLinks := self loadExplicitLinks.
 	
 	"Before loading pages create the LeExplicitLink object with the
 	same id as the one that is stored to disk. This is needed as setting pages 
@@ -105,16 +124,6 @@ LeLocalStoreLoad >> loadContentInDatabase: aDatabase [
 	aDatabase setPages: pages.
 	explicitLinks ifNotNil: [ 
 		aDatabase setExplicitLinks: explicitLinks ].
-]
-
-{ #category : #private }
-LeLocalStoreLoad >> loadExplicitLinksIn: aRootFolder [	
-	
-	storage withExplicitLinksFileIn: aRootFolder do: [ :aFile |
-		[ ^ storage loadFromFile: aFile ] 
-			on: LeDBLoadError 
-			fork: [ :ex | ex pass ] ].
-	^ nil
 ]
 
 { #category : #private }
@@ -153,15 +162,55 @@ LeLocalStoreLoad >> loadPagesIn: aRootFolder [
 	pages := OrderedCollection new.
 	(storage dbFilesIn: aRootFolder) do: [ :file |
 		[ page := storage loadFromFile: file.
-		(pageIds includes: page uid) ifTrue: 
-			[ file renameTo: (file withExtension: 'duplicate') basename.
-			duplicates add: file ]
-		ifFalse:
-			[ pageIds add: page uid.
-			pages add: page ] ]
-				on: LeDBLoadError 
-				fork: [ :ex | 
-					corrupted add: file.
-					ex pass ] ].
+		LeReloadOptimization ifEnabled: [
+			page storageHash: (LeBinaryContentsHash fromFileReference: file) ].
+		(pageIds includes: page uid) 
+			ifTrue: [ 
+				file renameTo: (file withExtension: 'duplicate') basename.
+				duplicates add: file ]
+			ifFalse: [ 
+				pageIds add: page uid.
+				pages add: page ] ]
+					on: LeDBLoadError 
+					fork: [ :ex | 
+						corrupted add: file.
+						ex pass ] ].
 	^ pages reject: #isNil
+]
+
+{ #category : #accessing }
+LeLocalStoreLoad >> onlyLoadFrom: aFileReference [
+	| monitor |
+
+	self localRoot: aFileReference.
+	monitor := LeLocalStoreMonitor new.
+	monitor localRoot: localRoot.
+	monitor storage: storage.
+	
+	database := LeDatabase new.
+	database monitor: monitor.
+	monitor database: database.
+	self loadDatabasePropertiesIn: database.
+	self loadContentInDatabase: database. 
+
+	^ database
+]
+
+{ #category : #accessing }
+LeLocalStoreLoad >> onlyLoadReadOnlyFrom: aFileReference [
+	| monitor |
+
+	self localRoot: aFileReference.
+	monitor := LeLocalStoreMonitor new.
+	monitor localRoot: localRoot.
+	monitor storage: storage.
+	
+	database := LeDatabase new.
+	database readOnly: true.
+	database monitor: monitor.
+	monitor database: database.
+	self loadDatabasePropertiesIn: database.
+	self loadContentInDatabase: database. 
+
+	^ database
 ]

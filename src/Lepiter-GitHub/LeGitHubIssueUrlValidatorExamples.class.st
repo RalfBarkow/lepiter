@@ -7,6 +7,7 @@ Class {
 { #category : #'examples - validator' }
 LeGitHubIssueUrlValidatorExamples >> basicValidator [
 	<gtExample>
+	<return: #LeGitHubIssueUrlValidator>
 	| aValidator |
 	aValidator := LeGitHubIssueUrlValidator new.
 	^ aValidator
@@ -28,15 +29,28 @@ LeGitHubIssueUrlValidatorExamples >> validUrl [
 ]
 
 { #category : #'examples - validator' }
+LeGitHubIssueUrlValidatorExamples >> validator_IllegalUrl [
+	<gtExample>
+	<return: #LeGitHubIssueUrlValidator>
+	| aValidator |
+	aValidator := LeGitHubIssueUrlValidator new.
+	aValidator url: 'Tudor Gîrba'.
+	aValidator validate.
+	self assert: aValidator isValid not.
+	^ aValidator
+]
+
+{ #category : #'examples - validator' }
 LeGitHubIssueUrlValidatorExamples >> validator_InvalidUrl [
 	<gtExample>
+	<return: #LeGitHubIssueUrlValidator>
 	| aValidator anUrl |
 	aValidator := LeGitHubIssueUrlValidator new.
 
 	anUrl := self invalidUrl.
 	aValidator url: anUrl.
 	self assert: aValidator url equals: anUrl.
-	
+
 	aValidator validate.
 	self assert: aValidator isValid equals: false.
 	self assert: aValidator identifier equals: anUrl.
@@ -47,13 +61,14 @@ LeGitHubIssueUrlValidatorExamples >> validator_InvalidUrl [
 { #category : #'examples - validator' }
 LeGitHubIssueUrlValidatorExamples >> validator_ShortInvalidUrl [
 	<gtExample>
+	<return: #LeGitHubIssueUrlValidator>
 	| aValidator anUrl |
 	aValidator := LeGitHubIssueUrlValidator new.
 
 	anUrl := self shortInvalidUrl.
 	aValidator url: anUrl.
 	self assert: aValidator url equals: anUrl.
-	
+
 	aValidator validate.
 	self assert: aValidator isValid equals: false.
 	self assert: aValidator identifier equals: anUrl.
@@ -64,13 +79,14 @@ LeGitHubIssueUrlValidatorExamples >> validator_ShortInvalidUrl [
 { #category : #'examples - validator' }
 LeGitHubIssueUrlValidatorExamples >> validator_ValidUrl [
 	<gtExample>
+	<return: #LeGitHubIssueUrlValidator>
 	| aValidator anUrl |
 	aValidator := LeGitHubIssueUrlValidator new.
 
 	anUrl := self validUrl.
 	aValidator url: anUrl.
 	self assert: aValidator url equals: anUrl.
-	
+
 	aValidator validate.
 	self assert: aValidator isValid equals: true.
 	self assert: aValidator ownerName equals: 'feenkcom'.

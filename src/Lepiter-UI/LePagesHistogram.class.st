@@ -38,7 +38,7 @@ LePagesHistogram >> pages: aCollectionOfPages between: aStartDate and: anEndDate
 				datesDo: [ :eachDate | 
 					aStream
 						nextPut: (pagesByDate at: eachDate ifAbsent: [ #() ]) size / maxPagesPerDay ] ].
-	self geometry: (BlHistogram new values: theNormalizedValues)
+	self geometry: (BlHistogramGeometry new values: theNormalizedValues)
 ]
 
 { #category : #accessing }

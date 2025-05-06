@@ -24,6 +24,19 @@ LeAnnotationNode >> compositeTokenVariables [
 ]
 
 { #category : #accessing }
+LeAnnotationNode >> dbNode [
+	^ self items detect: [ :each | each isDb ] ifNone: [  ]
+]
+
+{ #category : #testing }
+LeAnnotationNode >> doesReferenceExist [
+	^ self nameNode 
+		ifNil: [ false ]
+		ifNotNil: [ :aNameNode |
+			aNameNode doesReferenceExist ]
+]
+
+{ #category : #accessing }
 LeAnnotationNode >> expanded [
 	items
 		do: [ :each | 
@@ -50,6 +63,11 @@ LeAnnotationNode >> height [
 { #category : #accessing }
 LeAnnotationNode >> heightNode [
 	^ self items detect: [ :each | each isHeight ] ifNone: [  ]
+]
+
+{ #category : #accessing }
+LeAnnotationNode >> idNode [
+	^ self items detect: [ :each | each isId ] ifNone: [  ]
 ]
 
 { #category : #accessing }

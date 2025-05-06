@@ -13,9 +13,9 @@ Class {
 LePageReferencesExpanderAptitude >> initialize [
 	super initialize.
 
-	toggle := BrTriangle new
+	toggle := BrInlineExpanderElement new
 		beSmallSize;
-		aptitude: BrGlamorousTriangleInCircleAptitude;
+		aptitude: BrGlamorousTriangleInCircleExpanderAptitude;
 		toggleAction: [ self widget fireEvent: BrExpansionToggleWish new ];
 		margin: (BlInsets top: 2).
 
@@ -43,7 +43,6 @@ LePageReferencesExpanderAptitude >> initialize [
 		with: [ BlRoundedRectangleGeometry cornerRadius: 3 ].
 
 	container addAptitude: (BrLayoutResizerAptitude new
-		inherit; "for myself"
 		matchParentToMatchParent: [ :aBlock | self resizableElementsDo: aBlock ];
 		exactToMatchParent: [ :aBlock | self resizableElementsDo: aBlock ];
 		fitContentToFitContent: [ :aBlock | self resizableElementsDo: aBlock ];

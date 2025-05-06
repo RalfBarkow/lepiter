@@ -6,12 +6,11 @@ Class {
 	#name : #LeEvaluatedSnippetElement,
 	#superclass : #LeTextualSnippetElement,
 	#instVars : [
-		'spawnDestinationLook',
 		'editorElement',
-		'coderContentModel',
 		'coderToolbar',
 		'arrowElement',
-		'previewContainer'
+		'previewContainer',
+		'spawnDestination'
 	],
 	#category : #'Lepiter-UI-Snippet-! Views'
 }
@@ -28,10 +27,11 @@ LeEvaluatedSnippetElement >> arrowElement [
 
 { #category : #actions }
 LeEvaluatedSnippetElement >> clearPreview [
+	self arrowElement ifNil: [ ^ self ].
 	self arrowElement visibility: BlVisibility gone.
-	self previewContainer 
+	self previewContainer
 		visibility: BlVisibility gone;
-		removeChildNamed: #previewElement.
+		removeChildNamed: #previewElement
 ]
 
 { #category : #'private - accessing' }
@@ -50,24 +50,16 @@ LeEvaluatedSnippetElement >> coderViewModel [
 
 { #category : #accessing }
 LeEvaluatedSnippetElement >> editor [
-	<return: #BrTextEditor>
+	<return: #BrTextEditorModel>
 
 	^ editorElement editor
 ]
 
 { #category : #initialization }
-LeEvaluatedSnippetElement >> initialize [
-	super initialize.
-	
-	coderContentModel := GtSourceCoderContentModel new.
-	self addViewModel: coderContentModel
-]
-
-{ #category : #initialization }
 LeEvaluatedSnippetElement >> initializeCoderToolbar [
-	coderToolbar := GtCoderActionsElement new.
-	spawnDestinationLook := GtSourceCoderSpawnDestinationAptitude new.
-	coderToolbar addAptitude: spawnDestinationLook.
+	coderToolbar := GtSourceCoderActionsElement new.
+	spawnDestination := self newSpawnDesinationButton.
+	coderToolbar addChild: spawnDestination as: #spawnDestination
 ]
 
 { #category : #initialization }
@@ -84,7 +76,7 @@ LeEvaluatedSnippetElement >> newArrowElement [
 	^ BlElement new
 		size: 24@16;
 		visibility: BlVisibility gone; 
-		geometry: (BlPolygon vertices: { 0@0 . 24@0 . 12@16 } );
+		geometry: (BlPolygonGeometry vertices: { 0@0 . 24@0 . 12@16 } );
 		margin: (BlInsets top: 13 right: 5 bottom: 0 left: 0);
 		background: Color veryVeryLightGray;
 		constraintsDo: [ :c |
@@ -124,19 +116,26 @@ LeEvaluatedSnippetElement >> newPreviewElementFor: anObject [
 	^ aView asElementDo: [ :anElement | anElement ]
 ]
 
+{ #category : #'instance creation' }
+LeEvaluatedSnippetElement >> newSpawnDesinationButton [
+	^ BrButton new 
+		aptitude: BrGlamorousButtonWithIconAptitude - BrGlamorousButtonExteriorAptitude;
+		action: [ self switchSpawnDestination ];
+		label: 'Change the place where inspected objects are shown.';
+		constraintsDo: [ :c | 
+			c ignoreByLayout.
+			c ignored horizontal alignRight.
+			c ignored vertical alignBottom ];
+		zIndex: 10
+]
+
 { #category : #'api - snippet view model' }
 LeEvaluatedSnippetElement >> onSnippetViewModelChanged [
-	arrowElement hasParent
-		ifFalse: [ self addChild: arrowElement ].
-	previewContainer hasParent
-		ifFalse: [ self addChild: previewContainer ].
-
+	"we should assign the coder UI model *before* the focus state"
+	self updateSpawnDownElements.
 	self updateCoderUIModel.
 	self clearPreview.
-
-	"we should assign the coder UI model *before* the focus state"
-	super onSnippetViewModelChanged.
-
+	super onSnippetViewModelChanged
 ]
 
 { #category : #'api - snippet view model' }
@@ -198,14 +197,28 @@ LeEvaluatedSnippetElement >> spawnBelowTool: aTool [
 	| aPreviewElement |
 	
 	aPreviewElement := aTool asElement.
-	aPreviewElement dispatchEvent: GtPhlowToolDetailWish beNormalLevel.
+	aPreviewElement states addState: GtPhlowToolDetailState normal.
 	
 	self spawnBelowPreviewElement: aPreviewElement
 ]
 
 { #category : #'private - updating' }
+LeEvaluatedSnippetElement >> switchSpawnDestination [
+	snippetViewModel spawnDestination: snippetViewModel spawnDestination followingDestination.
+	spawnDestination icon: snippetViewModel spawnDestination icon
+]
+
+{ #category : #'private - updating' }
 LeEvaluatedSnippetElement >> updateCoderUIModel [
-	coderContentModel sourceCoder: self snippetViewModel coderViewModel.
 	editorElement textualCoderViewModel: self snippetViewModel coderViewModel.
-	spawnDestinationLook onCoderChanged: self snippetViewModel coderViewModel
+	coderToolbar coderViewModel: self snippetViewModel coderViewModel
+]
+
+{ #category : #'private - updating' }
+LeEvaluatedSnippetElement >> updateSpawnDownElements [
+	arrowElement ifNil: [ ^ self ].
+	arrowElement hasParent ifFalse: [ self addChild: arrowElement ].
+	previewContainer hasParent ifFalse: [ self addChild: previewContainer ].
+
+	spawnDestination icon: snippetViewModel spawnDestination icon
 ]

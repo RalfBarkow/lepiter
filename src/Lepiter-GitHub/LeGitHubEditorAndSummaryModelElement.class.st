@@ -33,9 +33,7 @@ LeGitHubEditorAndSummaryModelElement >> initialize [
 	self initializeSummaryElement.
 	
 	self addChild: self editorElement as: #editor.
-	self addChild: self summaryElement as: #summary.
-	
-	self addAptitude: (BrLayoutResizerAptitude inherit).
+	self addChild: self summaryElement as: #summary
 ]
 
 { #category : #initialization }
@@ -63,6 +61,14 @@ LeGitHubEditorAndSummaryModelElement >> showSummary [
 	self editorElement visibility: BlVisibility gone.
 	self summaryElement visibility: BlVisibility visible.
 
+]
+
+{ #category : #'as yet unclassified' }
+LeGitHubEditorAndSummaryModelElement >> snippetViewModel: anObject [
+	super snippetViewModel: anObject.
+	
+	summaryElement snippetViewModel: anObject.
+	editorElement snippetViewModel: anObject
 ]
 
 { #category : #'private - accessing' }

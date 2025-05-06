@@ -10,6 +10,11 @@ Class {
 }
 
 { #category : #accessing }
+LeSnippetWidth >> cssClass [
+	^ self subclassResponsibility
+]
+
+{ #category : #accessing }
 LeSnippetWidth >> maxWidth [
 	^ self subclassResponsibility
 ]

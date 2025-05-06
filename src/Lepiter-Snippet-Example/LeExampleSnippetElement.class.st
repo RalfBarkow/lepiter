@@ -7,8 +7,10 @@ Class {
 		'exampleContainer',
 		'exampleEditor',
 		'toolbarContainer',
-		'updateRequester',
-		'browseExampleButton'
+		'browseExampleButton',
+		'runExampleButton',
+		'exportExampleButton',
+		'mutexPreviewComputation'
 	],
 	#category : #'Lepiter-Snippet-Example-Snippet'
 }
@@ -19,9 +21,99 @@ LeExampleSnippetElement >> browseExample [
 		self phlow spawnTool: (GtMethodCoderTool compiledMethod: aGtExample method) ]
 ]
 
+{ #category : #'private - updating' }
+LeExampleSnippetElement >> computeExamplePreviewElement [
+	<return: #BlElement>
+	| anElement |
+	self snippetViewModel
+		cachedExamplePreviewDo: [ :aCachedComputedPreview | 
+			self
+				assert: [ aCachedComputedPreview element isNotNil ]
+				description: [ 'Cached example preview element must be non-nil.' ].
+
+			^ aCachedComputedPreview ].
+
+	self snippetViewModel
+		gtExampleDo: [ :aGtExample | 
+			anElement := LeExampleSnippetComputedPreview new
+					example: aGtExample;
+					element: (GtExamplePreviewStencil new
+							example: aGtExample asCachedExampleWithResult;
+							codeExpanded: self snippetViewModel codeExpanded;
+							noCode: self snippetViewModel noCode;
+							previewExpanded: self snippetViewModel previewExpanded;
+							previewShowSelector: self snippetViewModel previewShowSelector;
+							previewSelectSelector: self snippetViewModel previewSelectSelector;
+							previewHeight: self snippetViewModel previewHeight;
+							asElement) ]
+		ifAbsent: [ anElement := LeExampleSnippetNoPreview new
+					element: (BrHorizontalPane new
+							hMatchParent;
+							vExact: self snippetViewModel previewHeight;
+							geometry: (BlRoundedRectangleGeometry cornerRadius: 4);
+							alignCenter;
+							background: self theme default backdropColor;
+							addChild: (BrLabel new
+									aptitude: (BrGlamorousLabelAptitude new light foreground: Color veryDarkGray);
+									text: 'Example not found')) ].
+
+	self snippetViewModel cacheExamplePreview: anElement.
+	^ anElement
+]
+
+{ #category : #'private - updating' }
+LeExampleSnippetElement >> criticalComputeExamplePreviewElement [
+	<return: #BlElement>
+	^ mutexPreviewComputation critical: [ self computeExamplePreviewElement ]
+]
+
+{ #category : #'private - event handling' }
+LeExampleSnippetElement >> exportExample [
+
+	self snippetViewModel gtExampleDo: [ :aGtExample | 
+		exampleContainer
+			childNamed: #example
+			ifFound: [ :anExampleElement | 
+				anExampleElement
+					childNamed: #preview
+					ifFound: [ :aPreviewElement | 
+						| aFileName aQuery aQueryVisibility |
+						aQuery := aPreviewElement parent query / BrResizer.
+						aQueryVisibility := aQuery all collect: [ :eachElement | 
+							                    eachElement visibility ].
+						aQuery all do: [ :eachElement | 
+							eachElement visibility: BlVisibility hidden ].
+						exportExampleButton disable.
+
+						aFileName := GtFileUtility
+							             secureFileName:
+								             aGtExample providerClass name , '_'
+								             , aGtExample selector asString , '_'
+								             ,
+								             self snippetViewModel previewShowSelector
+									             asString
+							             extension: 'png'
+							             maxLength: 72.
+
+						aFileName asFileReference ensureDelete.
+
+						self enqueueTask: (BlTaskAction new action: [ 
+								 BlExporter png
+									 element: anExampleElement;
+									 scaled: 2;
+									 fileName: aFileName;
+									 export.
+
+								 aQuery all doWithIndex: [ :eachElement :eachIndex | 
+									 eachElement visibility: (aQueryVisibility at: eachIndex) ].
+								 exportExampleButton enable ]) ] ] ]
+]
+
 { #category : #initialization }
 LeExampleSnippetElement >> initialize [
 	super initialize.
+	
+	mutexPreviewComputation := Mutex new.
 	
 	exampleContainer := BlElement new
 		constraintsDo: [ :c | 
@@ -37,8 +129,17 @@ LeExampleSnippetElement >> initialize [
 		aptitude: BrGlamorousRegularEditorAptitude + BrGlamorousEditorSpacingAptitude;
 		padding: (BlInsets top: 2 left: 3 bottom: 2 right: 3);
 		margin: (BlInsets left: 2 right: 2).
+		
+	LeSnippetEditorElementShortcuter new
+		editor: exampleEditor;
+		indent;
+		moveUpAndDown;
+		loseFocus.
 	
-	exampleEditor editor addEventHandler: (LeEditorReachedBorderEventHandler new snippetElement: self).
+	exampleEditor editor 
+		addEventHandler: (LeEditorReachedBorderEventHandler new 
+			snippetElement: self);
+		ensureNoUndoRedoShortcuts.
 	
 	browseExampleButton := BrButton new
 		beSmallSize;
@@ -49,6 +150,24 @@ LeExampleSnippetElement >> initialize [
 		margin: (BlInsets top: 1 left: 4 bottom: 0 right: 3);
 		action: [ self browseExample ].
 
+	runExampleButton := BrButton new
+		beSmallSize;
+		disable;
+		aptitude: BrGlamorousButtonWithIconAptitude;
+		icon: BrGlamorousVectorIcons playinspect;
+		label: 'Play and inspect example result';
+		margin: (BlInsets top: 1 left: 4 bottom: 0 right: 3);
+		action: [ self runExample ].
+	
+	exportExampleButton := BrButton new
+		beSmallSize;
+		disable;
+		aptitude: BrGlamorousButtonWithIconAptitude;
+		icon: BrGlamorousIcons save;
+		label: 'Export example preview to a file';
+		margin: (BlInsets top: 1 left: 4 bottom: 0 right: 3);
+		action: [ self exportExample ].
+		
 	toolbarContainer := BrHorizontalPane new
 		hMatchParent;
 		vFitContent;
@@ -63,22 +182,32 @@ LeExampleSnippetElement >> initialize [
 				margin: (BlInsets top: 1);
 				aptitude: (BrGlamorousLabelAptitude new foreground: Color darkGray);
 				text: '}}'.
-			browseExampleButton }.
-				
-	updateRequester := GtPhlowUpdateRequester new 
-		element: self selector: #updateExamplePreview.
+			browseExampleButton.
+			exportExampleButton.
+			runExampleButton }.
+	
+	self initializeAsyncFuture
+]
+
+{ #category : #initialization }
+LeExampleSnippetElement >> initializeAsyncFuture [
+	self
+		withAsyncFutureDo: [ :anElementFuture | 
+			anElementFuture
+				whenPending: [ :theContainer | self updateExamplePreviewWithRendingElement ];
+				whenError: [ :theContainer :anError | self updateExamplePreviewWithError: anError ];
+				whenSuccess: [ :theContainer :aComputedExamplePreview | self updateExamplePreviewWithPreview: aComputedExamplePreview ] ]
 ]
 
 { #category : #'private - event handling' }
 LeExampleSnippetElement >> onExampleSnippetContentChanged [
-	updateRequester requestUpdate
+	self enqueueTask: (BlTaskAction new action: [ self requestExamplePreviewUpdate ])
 ]
 
 { #category : #'api - snippet view model' }
 LeExampleSnippetElement >> onSnippetViewModelChanged [
 	super onSnippetViewModelChanged.
-	
-	self updateExamplePreview
+	self requestExamplePreviewUpdate
 ]
 
 { #category : #'api - snippet view model' }
@@ -90,6 +219,20 @@ LeExampleSnippetElement >> onSnippetViewModelFocused: aBoolean [
 
 	aBoolean
 		ifFalse: [ self loseFocus ]
+]
+
+{ #category : #'private - updating' }
+LeExampleSnippetElement >> requestExamplePreviewUpdate [
+	"I must be executed in a UI process."
+
+	self
+		withAsyncFutureDo: [ :anElementFuture | anElementFuture future: [ self criticalComputeExamplePreviewElement ] ]
+]
+
+{ #category : #'private - event handling' }
+LeExampleSnippetElement >> runExample [
+	self snippetViewModel gtExampleDo: [ :aGtExample |
+		self phlow spawnObject: aGtExample run returnValue ]
 ]
 
 { #category : #'api - view' }
@@ -124,38 +267,78 @@ LeExampleSnippetElement >> subscribeToSnippetViewModel [
 ]
 
 { #category : #'private - updating' }
-LeExampleSnippetElement >> updateExamplePreview [
-	exampleEditor textualCoderViewModel: self snippetViewModel annotationCoderViewModel.
-	
+LeExampleSnippetElement >> updateExamplePreviewWithError: anError [
+	"I must be executed in a UI process."
+
+	self snippetViewModel clearCachedExamplePreview.
+	exportExampleButton disable.
+
 	exampleContainer removeChildNamed: #example.
+	exampleContainer addChild: anError asDebuggableElement as: #example
+]
 
-	self snippetViewModel gtExampleDo: [ :aGtExample |
-		| anExampleElement |
-		
-		browseExampleButton enable.
-	
-		anExampleElement := GtExamplePreviewStencil new
-			example: aGtExample;
-			codeExpanded: self snippetViewModel codeExpanded;
-			noCode: self snippetViewModel noCode;
-			previewExpanded: self snippetViewModel previewExpanded;
-			previewShowSelector: self snippetViewModel previewShowSelector;
-			previewHeight: self snippetViewModel previewHeight;
-			asElement.
+{ #category : #'private - updating' }
+LeExampleSnippetElement >> updateExamplePreviewWithPreview: aComputedExamplePreview [
+	"I must be executed in a UI process."
 
-		exampleContainer addChild: anExampleElement as: #example.
-		^ self ].
-	
-	browseExampleButton disable.
-	
-	exampleContainer addChild: (BrHorizontalPane new
-		hMatchParent;
-		vExact: self snippetViewModel previewHeight;
-		geometry: (BlRoundedRectangleGeometry cornerRadius: 4);
-		alignCenter;
-		background: self theme default backdropColor;
-		addChild: (BrLabel new
-			aptitude: (BrGlamorousLabelAptitude new light foreground: Color veryDarkGray);
-			text: 'Example not found')
-	) as: #example.
+	self snippetViewModel
+		cachedExamplePreviewDo: [ :aCachedComputedPreview | aCachedComputedPreview == aComputedExamplePreview ifFalse: [ ^ self ] ]
+		ifAbsent: [ ^ self ].
+
+	exampleEditor
+		textualCoderViewModel: self snippetViewModel annotationCoderViewModel.
+
+	aComputedExamplePreview hasExamplePreview
+		ifTrue: [ exportExampleButton enable ]
+		ifFalse: [ exportExampleButton disable ].
+
+	aComputedExamplePreview hasExample
+		ifTrue: [ browseExampleButton enable.
+			runExampleButton enable ]
+		ifFalse: [ browseExampleButton disable.
+			runExampleButton disable ].
+
+	(aComputedExamplePreview hasElement
+		and: [ aComputedExamplePreview element parent = exampleContainer ])
+		ifTrue: [ ^ self ].
+
+	exampleContainer removeChildNamed: #example.
+	aComputedExamplePreview hasElement
+		ifTrue: [ "self
+				assert: [ aComputedExamplePreview element isAttachedToSceneGraph not ]
+				description: [ 'Cached example preview element must be detached from a scene graph.' ]."
+
+			aComputedExamplePreview element removeFromParent.
+			exampleContainer addChild: aComputedExamplePreview element as: #example ]
+]
+
+{ #category : #'private - updating' }
+LeExampleSnippetElement >> updateExamplePreviewWithRendingElement [
+	| anElement |
+	self snippetViewModel
+		cachedExamplePreviewDo: [ :aCachedComputedPreview | ^ self ].
+
+	exportExampleButton disable.
+
+	self snippetViewModel
+		gtExampleDo: [ :aGtExample | 
+			browseExampleButton enable.
+			runExampleButton enable ]
+		ifAbsent: [ browseExampleButton disable.
+			runExampleButton disable ].
+
+	exampleEditor
+		textualCoderViewModel: self snippetViewModel annotationCoderViewModel.
+
+	anElement := BrHorizontalPane new
+			hMatchParent;
+			vExact: self snippetViewModel previewHeight;
+			geometry: (BlRoundedRectangleGeometry cornerRadius: 4);
+			alignCenter;
+			addChild: (BrLabel new
+					aptitude: (BrGlamorousLabelAptitude new light foreground: Color veryDarkGray);
+					text: 'Rendering...').
+
+	exampleContainer removeChildNamed: #example.
+	exampleContainer addChild: anElement as: #example
 ]

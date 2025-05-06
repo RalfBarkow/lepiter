@@ -4,14 +4,13 @@ Class {
 	#instVars : [
 		'issueNumber'
 	],
-	#category : #'Lepiter-GitHub-Client'
+	#category : 'Lepiter-GitHub-Client'
 }
 
 { #category : #'private - execution' }
 LeGitHubIssueCommand >> download [
 	| aRawData |
 	aRawData := IceGitHubAPI new
-			beAnonymous;
 			getIssue: self userName 
 				project: self projectName 
 				number: self issueNumber.

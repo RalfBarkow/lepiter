@@ -1,67 +1,70 @@
-"
-Demonstrate the operation of {{gtClass:name=LeHtmlPageExporterVisitor}}.
-
-Since there is no database present at this level, links to other pages, etc. can't be resolved.
-
-"
 Class {
 	#name : #LeHtmlPageExporterExamples,
 	#superclass : #Object,
+	#traits : 'TLeHtmlContentAssertions',
+	#classTraits : 'TLeHtmlContentAssertions classTrait',
 	#category : #'Lepiter-HTML-Examples'
 }
 
-{ #category : #private }
-LeHtmlPageExporterExamples >> sampleCssFile [
-	"Answer the sample css file included in the test data"
+{ #category : #examples }
+LeHtmlPageExporterExamples >> exportSamplePage [
+	<gtExample>
+	<return: #LeHtmlPageExporter>
+	| page exporter html |
+	page := LeExportSampleData new samplePage.
 
-	^ self testDataLocation / 'html-export' / 'attachments/5btjm1n0n6rsaizw19rtczbv6/sample.css'
-]
+	exporter := LeHtmlPageExporter new.
+	exporter page: page.
 
-{ #category : #private }
-LeHtmlPageExporterExamples >> sampleDatabase [
-	"Answer the sample database to be used.
-	The database is opened without a monitor, so no changes will be saved"
+	html := exporter contents.
 
-	^ LeLocalStoreLoad current loadFrom: self sampleDatabaseLocation
-]
+	self assertNotEmptyHtml: html.
 
-{ #category : #private }
-LeHtmlPageExporterExamples >> sampleDatabaseLocation [
-	"Answer the sample database for the examples"
-
-	^ self testDataLocation / 'html-export'
+	^ exporter
 ]
 
 { #category : #examples }
-LeHtmlPageExporterExamples >> samplePage [
-	"Answer the html of a sample page"
+LeHtmlPageExporterExamples >> exportSamplePageFullHtml [
 	<gtExample>
-	| database visitor html page |
+	<return: #LeHtmlPageExporter>
+	| page exporter html piece |
+	page := LeExportSampleData new samplePage.
+	piece := LeHtmlPieceExamples new formatPiece.
+	piece at: #content put: LeHtmlPagePiece new.
+	piece at: #title put: LeHtmlPageTitlePiece new.
 
-	database := self sampleDatabase.
-	page := database pageNamed: 'HTML Export Sample Page'.
+	exporter := LeHtmlPageExporter new
+			page: page;
+			piece: piece.
 
-	html := String streamContents: [ :stream |
-		visitor := LeHtmlPageExporterVisitor new stream: stream.
-		visitor addInternalStyle: self sampleCssFile contents.
-		page acceptVisitor: visitor ].
+	html := exporter contents.
 
-	self assert: (html includesSubstring: '<i>italic</i>').
-	self assert: (html includesSubstring: '<b>bold</b>').
-	self assert: (html includesSubstring: '<code>code</code>').
+	self assertNotEmptyHtml: html.
 
-	^ html
+	^ exporter
 ]
 
-{ #category : #tests }
-LeHtmlPageExporterExamples >> testDataLocation [
-	"Answer the location of the test data based on the git repository"
-	| fileReference |
+{ #category : #examples }
+LeHtmlPageExporterExamples >> pageWithTextSnippetUsedAsPagePreview [
+	<gtExample>
+	<return: #LeHtmlPageExporter>
+	| page exporter html piece |
+	page := LeExportPageExamples new pageWithTextSnippetUsedAsPagePreview.
+	piece := LeHtmlGtBookPiece gtSinglePage.
 
-	fileReference := (GtResourceReference path: Path 
-		* 'feenkcom' 
-		/ 'lepiter' 
-		/ 'test-data') fileReference.
-	self assert: fileReference exists.
-	^ fileReference.
+	exporter := LeHtmlPageExporter new
+			page: page;
+			piece: piece.
+
+	html := exporter contents.
+
+	self assertNotEmptyHtml: html.
+	self
+		assertHtml: html
+		includes: '<meta name="description" content="GToolkit, Button, action method, is italic.">'.
+	self
+		assertHtml: html
+		includes: '<meta property="og:description" content="GToolkit, Button, action method, is italic.">'.
+
+	^ exporter
 ]

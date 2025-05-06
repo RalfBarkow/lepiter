@@ -1,102 +1,108 @@
 Class {
 	#name : #LeContentCompletionVisitor,
 	#superclass : #LeContentNodeVisitor,
-	#traits : 'TSmaCCCompositeVisitor + (TLeContentNodeVisitor - {#acceptNode:})',
-	#classTraits : 'TSmaCCCompositeVisitor classTrait + TLeContentNodeVisitor classTrait',
+	#traits : 'TLeExtensibleContentNodeVisitor + TSmaCCCompositeVisitor + (TLeContentNodeVisitor - {#acceptNode:})',
+	#classTraits : 'TLeExtensibleContentNodeVisitor classTrait + TSmaCCCompositeVisitor classTrait + TLeContentNodeVisitor classTrait',
 	#instVars : [
 		'strategy',
 		'text',
 		'position',
-		'actionBlock'
-	],
-	#classVars : [
-		'AdditionalCompletionVisitors'
+		'stream',
+		'completionResult'
 	],
 	#category : #'Lepiter-UI-Snippet-Text completion'
 }
 
 { #category : #accessing }
 LeContentCompletionVisitor class >> additionalCompletionVisitors [
-	^ AdditionalCompletionVisitors
-		ifNil: [ AdditionalCompletionVisitors := self defaultCompletionVisitors ]
+	^ self componentVisitorClasses
 ]
 
 { #category : #accessing }
-LeContentCompletionVisitor class >> defaultCompletionVisitors [
+LeContentCompletionVisitor class >> defaultComponentVisitorClasses [
 	^ OrderedCollection with: LeAnnotationCompletionVisitor
 ]
 
-{ #category : #accessing }
-LeContentCompletionVisitor >> actionBlock: aBlock [
-	actionBlock := aBlock
-]
-
 { #category : #actions }
-LeContentCompletionVisitor >> addAction: aCompletionAction [
-	actionBlock value: aCompletionAction
+LeContentCompletionVisitor >> addStream: aStream [
+	stream := stream merge: aStream
 ]
 
 { #category : #private }
 LeContentCompletionVisitor >> completeStartAnnotation: aNode startingWith: aString [
 	| trailing source completions |
-	completions := LeParser annotationParsers keys
-		select: [ :each | aString isEmpty or: [ each beginsWith: aString ] ].
-	completions isEmpty
-		ifTrue: [ ^ self ].
+	completions := LeParser annotationParsers keys select: [ :each | aString isEmpty or: [ each beginsWith: aString ] ].
+	completions isEmpty ifTrue: [ ^ self ].
 	trailing := ':}}'.
 	source := aNode completeSource.
 	source size > self position
-		ifTrue: [ (source at: self position + 1) = $}
-				ifTrue: [ trailing := (source size > (self position + 1)
-						and: [ (source at: self position + 2) = $} ])
+		ifTrue:
+			[ (source at: self position + 1) = $}
+				ifTrue:
+					[ trailing := (source size > (self position + 1) and: [ (source at: self position + 2) = $} ])
 						ifTrue: [ ':' ]
 						ifFalse: [ ':}' ] ] ].
-	completions asSortedCollection
-		do: [ :each | 
-			self
-				addAction:
+	self
+		addStream:
+			(completions asSortedCollection asAsyncStream
+				collect:
+					[ :each | 
 					(GtInsertTextAndPositionCursorCompletionAction
-						labeled: each
+						labeled: (self strategy labelFor: each withSearch: aString)
 						completion: (each allButFirst: aString size) , trailing
 						position: self position
 						from: self position
-						newPosition: self position + each size - aString size + 1) ]
+						newPosition: self position + each size - aString size + 1) partial: true ])
+]
+
+{ #category : #accessing }
+LeContentCompletionVisitor >> completionResult [
+	^ completionResult ifNil: [ GtStreamedCompletionResult onStream: stream ]
+]
+
+{ #category : #accessing }
+LeContentCompletionVisitor >> completionResult: aGtCompletionResult [
+	completionResult := aGtCompletionResult
+]
+
+{ #category : #testing }
+LeContentCompletionVisitor >> hasCompletionResult [
+	^ completionResult notNil
 ]
 
 { #category : #private }
 LeContentCompletionVisitor >> hashCompletionActionsWithPrefix: prefix [
-	^ (self strategy pageTitles first: 100 startingWith: prefix)
-		collect: [ :each | 
-			| linkName needsBrackets mainAction |
-			needsBrackets := each anySatisfy: [ :c | c isSeparator ].
-			linkName := needsBrackets
-				ifTrue: [ (prefix isEmpty
-						ifTrue: [ '[[' ]
-						ifFalse: [ '' ]) , each , ']]' ]
-				ifFalse: [ each ].
-			mainAction := GtInsertTextCompletionAction
-				labeled: linkName
-				completion: (linkName allButFirst: prefix size)
-				position: self position
-				from: self position - prefix size.
-			(needsBrackets and: [ prefix notEmpty ])
-				ifTrue: [ mainAction := (GtCompositeCompletionAction labeled: '[[' , linkName)
-						addAction: mainAction;
-						addAction:
-							(GtInsertTextCompletionAction
-								labeled: '[['
-								completion: '[['
-								position: self position - prefix size
-								from: self position - prefix size);
-						yourself ].
-			self addAction: mainAction ]
+	^ self
+		addStream:
+			((self strategy pageTitles asyncStreamStartingWith: prefix)
+				collect:
+					[ :each | 
+					| linkName needsBrackets mainAction |
+					needsBrackets := each anySatisfy: [ :c | c isSeparator ].
+					linkName := needsBrackets ifTrue: [ (prefix isEmpty ifTrue: [ '[[' ] ifFalse: [ '' ]) , each , ']]' ] ifFalse: [ each ].
+					mainAction := GtInsertTextCompletionAction
+						labeled: (self strategy labelFor: linkName withSearch: prefix)
+						completion: (linkName allButFirst: prefix size)
+						position: self position
+						from: self position - prefix size.
+					(needsBrackets and: [ prefix notEmpty ])
+						ifTrue:
+							[ mainAction := (GtCompositeCompletionAction labeled: (self strategy labelFor: '[[' , linkName withSearch: prefix))
+								addAction: mainAction;
+								addAction:
+										(GtInsertTextCompletionAction
+												labeled: '[['
+												completion: '[['
+												position: self position - prefix size
+												from: self position - prefix size);
+								yourself ].
+					mainAction ])
 ]
 
 { #category : #initialization }
 LeContentCompletionVisitor >> initialize [
 	super initialize.
-	self class additionalCompletionVisitors
-		do: [ :each | self addVisitor: each new ]
+	stream := #() asAsyncStream
 ]
 
 { #category : #accessing }
@@ -117,6 +123,11 @@ LeContentCompletionVisitor >> strategy [
 { #category : #accessing }
 LeContentCompletionVisitor >> strategy: aCompletionStrategy [
 	strategy := aCompletionStrategy
+]
+
+{ #category : #accessing }
+LeContentCompletionVisitor >> stream [
+	^ stream
 ]
 
 { #category : #accessing }

@@ -31,11 +31,9 @@ LePharoClassPageType class >> pageClassName: aSymbol page: aLePage [
 LePharoClassPageType >> = anObject [
 	"Answer whether the receiver and anObject represent the same page type."
 
-	self == anObject
-		ifTrue: [ ^ true ].
-	self class = anObject class
-		ifFalse: [ ^ false ].
-	^ pageClassName = anObject pageClassName
+	self == anObject ifTrue: [ ^ true ].
+	self class = anObject class ifFalse: [ ^ false ].
+	^ pageClassName sameContentAs: anObject pageClassName
 ]
 
 { #category : #accessing }
@@ -62,11 +60,11 @@ LePharoClassPageType >> pageClass [
 	^ (pageClassName endsWith: ' class')
 		ifTrue: [
 			| instanceClassName | 
-			instanceClassName := (pageClassName removeSuffix: ' class') asSymbol.
+			instanceClassName := (pageClassName withoutSuffix: ' class') asSymbol.
 			instanceClassName := self class environment at: instanceClassName.
 			instanceClassName classSide ]
 		ifFalse: [ 
-			self class environment at: pageClassName ]
+			self class environment at: pageClassName asSymbol ]
 ]
 
 { #category : #accessing }
@@ -78,7 +76,7 @@ LePharoClassPageType >> pageClassName [
 
 { #category : #accessing }
 LePharoClassPageType >> pageClassName: aSymbolOrString [
-	"Set the receiver's class. The class name is stored as a Symbol or String"
+	"Set the receiver's class. The class name is stored as a Symbol or String."
 
 	pageClassName := aSymbolOrString
 ]
@@ -94,5 +92,5 @@ LePharoClassPageType >> printOn: aStream [
 { #category : #accessing }
 LePharoClassPageType >> title [
 
-	^ pageClassName, ' Page'
+	^ pageClassName asString, ' Page'
 ]

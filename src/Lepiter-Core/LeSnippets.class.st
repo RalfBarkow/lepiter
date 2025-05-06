@@ -44,12 +44,13 @@ LeSnippets >> gtSnippetsFor: aView [
 		items: [ self ];
 		children: [ :eachPage | eachPage children ];
 		expandUpTo: 5;
-		column: 'Type' item: [ :aSnippet | aSnippet class ] width: 200;
+		column: 'Type' text: [ :aSnippet | aSnippet class ] width: 200;
 		column: 'Content'
-			item: [ :aSnippet | aSnippet contentAsString truncateTo: 200 ]
+			text: [ :aSnippet | aSnippet contentAsString truncateTo: 200 ]
 			width: 200;
-		column: 'Edit Time' item: #editOrCreateTime;
-		column: 'Author' item: #editOrCreateEmail
+		column: 'Edit Time' text: #editOrCreateTime;
+		column: 'Author' text: #editOrCreateEmail;
+		actionUpdateButton
 ]
 
 { #category : #testing }
@@ -77,6 +78,32 @@ LeSnippets >> indentSnippet: aLeSnippet [
 	newParent attachChildSnippet: targetSnippet.
 	items removeAt: index.
 	^ newParent.
+]
+
+{ #category : #testing }
+LeSnippets >> isChildAtFirstPositionFor: aLeSnippet [
+	"Check if the given snippet is at first position.
+	Throw an error if the snippet is not found."
+	| index |
+
+	index := items indexOf: aLeSnippet.
+	index < 1 ifTrue: [ 
+		self error: 'Couldn''t find snippet: ', aLeSnippet asString ].
+	
+	^ index = 1 
+]
+
+{ #category : #testing }
+LeSnippets >> isChildAtLastPositionFor: aLeSnippet [
+	"Check if the given snippet is at last position.
+	Throw an error if the snippet is not found."
+	| index |
+
+	index := items indexOf: aLeSnippet.
+	index < 1 ifTrue: [ 
+		self error: 'Couldn''t find snippet: ', aLeSnippet asString ].
+	
+	^ index = items size
 ]
 
 { #category : #'api - editing' }
@@ -152,16 +179,6 @@ LeSnippets >> moveUpSnippet: aLeSnippet [
 	^ true
 ]
 
-{ #category : #serialization }
-LeSnippets >> neoJsonOn: neoJSONWriter [
-	"If the receiver has only a single, empty child, write an empty collection"
-
-	(items size = 1 and: [ items first isEmpty ]) ifTrue: 
-		[ neoJSONWriter nextPut: self class new.
-		^ self ].
-	neoJSONWriter writeObject: self
-]
-
 { #category : #printing }
 LeSnippets >> printOn: aStream [
 	aStream 
@@ -175,4 +192,12 @@ LeSnippets >> removeSnippet: aLeSnippet [
 
 	items remove: aLeSnippet.
 	aLeSnippet detachFromParent
+]
+
+{ #category : #accessing }
+LeSnippets >> swapSnippetAtIndex: aIndex withSnippetWithUid: anotherUid [
+	self items
+		swap: aIndex 
+		with: (self items 
+			detectIndex: [ :aSnippet | aSnippet uid = anotherUid ] ) 
 ]

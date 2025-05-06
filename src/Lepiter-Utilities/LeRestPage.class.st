@@ -15,9 +15,9 @@ LeRestPage >> allChildrenDepthFirstDo: aBlock [
 
 { #category : #converting }
 LeRestPage >> asContentUIModel [
-	<return: #LeContentViewModel>
 
-	^ LePageViewModel new page: self
+	<return: #LeContentViewModel>
+	^ LePageViewModel new pageModel: self
 ]
 
 { #category : #'private - accessing' }
@@ -68,6 +68,14 @@ LeRestPage >> page [
 { #category : #accessing }
 LeRestPage >> page: anObject [
 	page := anObject
+]
+
+{ #category : #printing }
+LeRestPage >> printPageSummaryLimitedTo: aNumber [
+	"Return a short textual representation of the content of the page"
+	<return: #String>
+
+	^ ''
 ]
 
 { #category : #accessing }

@@ -6,8 +6,8 @@ Class {
 	#instVars : [
 		'announcer',
 		'databaseViewModel',
-		'snippetBindings',
-		'shouldFocusFirstSnippet'
+		'shouldFocusFirstSnippet',
+		'sharedSnippetContext'
 	],
 	#category : #'Lepiter-UI-Page-! View Models'
 }
@@ -63,14 +63,28 @@ LePageViewModel >> databaseViewModel: anObject [
 
 { #category : #'api - page' }
 LePageViewModel >> ensurePageHasAtLeastOneSnippet [
-	self pageModel ensureOneBlock
+	self pageModel ensureOneSnippet
+]
+
+{ #category : #accessing }
+LePageViewModel >> externalSnippetContext: anExternalSnippetContext [
+	sharedSnippetContext externalSnippetContext: anExternalSnippetContext
+]
+
+{ #category : #printing }
+LePageViewModel >> gtDisplayOn: aStream [
+	pageModel
+		ifNil: [ super gtDisplayOn: aStream ]
+		ifNotNil: [ :aPage | 
+			aStream nextPutAll: 'Page view model of '.
+			aPage gtDisplayOn: aStream ]
 ]
 
 { #category : #initialization }
 LePageViewModel >> initialize [
 	super initialize.
 	
-	snippetBindings := GtSnippetBindings new.
+	sharedSnippetContext := LeSharedSnippetContext new.
 	shouldFocusFirstSnippet := false
 ]
 
@@ -114,20 +128,16 @@ LePageViewModel >> onPageMoved: aPageDatabaseMovedAnnouncement [
 
 { #category : #'private - event handling' }
 LePageViewModel >> onPageRemoved: aPageRemovedAnnouncement [
-	| aRemovedPage anOriginalDatabase anotherPage |
-
+	| aRemovedPage anOriginalDatabase |
 	aRemovedPage := aPageRemovedAnnouncement page.
-	self pageModel = aRemovedPage
-		ifFalse: [ ^ self ].
-	
-	anOriginalDatabase := aPageRemovedAnnouncement database.
-	
-	"I display another page or create a new one, if there is no other page to display."
-	anotherPage := anOriginalDatabase hasChildren 
-		ifTrue: [ anOriginalDatabase anyOne ]
-		ifFalse: [ (anOriginalDatabase pageBuilder uniqueTitle; add) ].
+	self pageModel = aRemovedPage ifFalse: [ ^ self ].
 
-	self pageModel: anotherPage
+	anOriginalDatabase := aPageRemovedAnnouncement database.
+
+	"See https://github.com/feenkcom/gtoolkit/issues/4186"
+	self announce: (LePageViewModelPageRemoved new 
+		pageViewModel: self;
+		originalDatabase: anOriginalDatabase)
 ]
 
 { #category : #'private - event handling' }
@@ -261,24 +271,49 @@ LePageViewModel >> printPageSummaryLimitedTo: aNumber [
 { #category : #'api - page' }
 LePageViewModel >> printPageTabLabel [
 	"Return a short title that fits nicely in ${class:LeWorldElement}$'s tab label"
+
 	<return: #String>
-	| aTitle |
-
-	aTitle := self pageTitle.
-
-	^ aTitle size < 21
-		ifTrue: [ aTitle ]
-		ifFalse: [ (aTitle first: (aTitle size min: 21)), '...' ]
+	^ self pageModel printPageTabLabel
 ]
 
 { #category : #accessing }
 LePageViewModel >> receiver: anObject [
-	self snippetBindings receiver: anObject.
+	sharedSnippetContext selfObject: anObject
+]
+
+{ #category : #'api - undo/redo' }
+LePageViewModel >> redoCurrent [
+	^ self pageModel editHistory redoCurrent
+]
+
+{ #category : #'api - undo/redo' }
+LePageViewModel >> redoCurrentUpdatingSnippetsViewModelFor: aSnippetsViewModel [
+	self redoCurrentWithResultAction: [ :aCommandResult |
+		aCommandResult targetCommandResult 
+				updateSnippetsViewModelFor: aSnippetsViewModel ]
+]
+
+{ #category : #'api - undo/redo' }
+LePageViewModel >> redoCurrentWithResultAction: aResultActionBlock [
+	| redoResult |
+	redoResult := self redoCurrent.
+	redoResult ifNil: [ 
+		"No need to do any update if no undo was executed."
+		^ self ].
+		
+	aResultActionBlock cull: redoResult
 ]
 
 { #category : #'api - page' }
 LePageViewModel >> removePage [
 	self pageModel removeSelf
+]
+
+{ #category : #accessing }
+LePageViewModel >> sharedSnippetContext [
+	<return: #LeSharedSnippetContext>
+
+	^ sharedSnippetContext
 ]
 
 { #category : #accessing }
@@ -293,9 +328,9 @@ LePageViewModel >> shouldFocusFirstSnippet: aBoolean [
 
 { #category : #accessing }
 LePageViewModel >> snippetBindings [
-	<return: #GtSnippetBindings>
+	<return: #GtSharedVariablesBindings>
 
-	^ snippetBindings
+	^ sharedSnippetContext sharedBindings
 ]
 
 { #category : #'api - page model' }
@@ -312,6 +347,29 @@ LePageViewModel >> subscribeToPageModel [
 		when: LePageRemovedFromDatabase send: #onPageRemoved: to: self;
 		when: LePageUnloadAnnouncement send: #onPageRemoved: to: self;
 		when: LePageDatabaseChanged send: #onPageMoved: to: self.
+]
+
+{ #category : #'api - undo/redo' }
+LePageViewModel >> undoCurrent [
+	^ self pageModel editHistory undoCurrent
+]
+
+{ #category : #'api - undo/redo' }
+LePageViewModel >> undoCurrentUpdatingSnippetsViewModelFor: aSnippetsViewModel [
+	self undoCurrentWithResultAction: [ :aCommandResult |
+		aCommandResult targetCommandResult 
+				updateSnippetsViewModelFor: aSnippetsViewModel ]
+]
+
+{ #category : #'api - undo/redo' }
+LePageViewModel >> undoCurrentWithResultAction: aResultActionBlock [
+	| undoResult |
+	undoResult := self undoCurrent.
+	undoResult ifNil: [ 
+		"No need to do any update if no undo was executed."
+		^ self ].
+		
+	aResultActionBlock cull: undoResult
 ]
 
 { #category : #'api - page model' }

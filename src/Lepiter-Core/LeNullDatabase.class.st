@@ -33,6 +33,11 @@ LeNullDatabase >> dailyNotes [
 ]
 
 { #category : #'api - accessing' }
+LeNullDatabase >> dailyNotesGroup [
+	^ #()
+]
+
+{ #category : #'api - accessing' }
 LeNullDatabase >> databaseName [
 	^ ''
 ]
@@ -55,6 +60,12 @@ LeNullDatabase >> explicitLinks [
 { #category : #'api - testing' }
 LeNullDatabase >> hasChildren [
 	^ false
+]
+
+{ #category : #'api - testing' }
+LeNullDatabase >> hasPageNamed: aString [
+
+	^ false.
 ]
 
 { #category : #'api - testing' }
@@ -156,17 +167,35 @@ LeNullDatabase >> tableOfContents [
 	^ nil
 ]
 
+{ #category : #accessing }
+LeNullDatabase >> tableOfContentsNodes [
+	^ #()
+]
+
 { #category : #'adding / removing' }
 LeNullDatabase >> unregisterSnippet: aSnippet [
 ]
 
+{ #category : #updating }
+LeNullDatabase >> updateUnresolvedReferencesForPage: aPage [
+]
+
 { #category : #'api - accessing' }
 LeNullDatabase >> userEmail [
-	^ LeEmail null
+	"We use here nil explicitly insteaf of a null object.
+	This is used when adding snippets to a database. 
+	In those cases we live the email to be nil."
+	
+	^ nil
 ]
 
 { #category : #accessing }
 LeNullDatabase >> uuid [
 
 	^ UUID nilUUID
+]
+
+{ #category : #accessing }
+LeNullDatabase >> uuidString [
+	^ ''
 ]

@@ -120,7 +120,7 @@ LeWordSnippetElement >> initializeToolbarElement [
 	toolbarElement addItem: editButton.
 	
 	errorLabelElement := BrLabel new
-		id: LeGitHubErrorMessageElementId;
+		id: LeWordErrorMessageElementId;
 		aptitude: (BrGlamorousLabelAptitude new foreground: BrGlamorousColors errorBackgroundColor);
 		text: '';
 		vFitContentLimited;

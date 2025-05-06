@@ -37,7 +37,7 @@ LeTweetRefMediaLinkReference class >> leJsonV4Name [
 
 { #category : #converting }
 LeTweetRefMediaLinkReference >> asPreviewElement [
-	^ BlUrlImageElement new
+	^ BrAsyncFileWidget new
 		url: (self url asZnUrl & ('format' -> 'jpg')) asString;
 		constraintsDo: [ :c |
 			c horizontal matchParent.
@@ -79,13 +79,15 @@ LeTweetRefMediaLinkReference >> media: anObject [
 { #category : #'api - json' }
 LeTweetRefMediaLinkReference >> mediaRawData [
 	"I am used to store the object as a JSON string"
-	^ self media rawData
+
+	^ media ifNotNil: [ media rawData ].
 ]
 
 { #category : #'api - json' }
 LeTweetRefMediaLinkReference >> mediaRawData: aDictionary [
 	"I am used to initialize the object from a JSON string"
-	self media: (LeTweetMedia new rawData: aDictionary)
+
+	media := aDictionary ifNotNil: [ LeTweetMedia new rawData: aDictionary ]
 ]
 
 { #category : #'api - accessing' }

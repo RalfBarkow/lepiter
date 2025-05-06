@@ -25,7 +25,7 @@ LeContentAttributesReloader >> allContentAttributeMappings [
 ]
 
 { #category : #assertions }
-LeContentAttributesReloader >> assertCanUpdateFomContent: aContent [
+LeContentAttributesReloader >> assertCanUpdateFromContent: aContent [
 	self assert: [ self targetContent notNil ].
 	self assert: [ aContent notNil ].
 	self assert: [ self targetContent class = aContent class ].
@@ -35,6 +35,13 @@ LeContentAttributesReloader >> assertCanUpdateFomContent: aContent [
 { #category : #accessing }
 LeContentAttributesReloader >> changedAttributes [
 	^ changedAttributes ifNil: [ #() ]
+]
+
+{ #category : #accessing }
+LeContentAttributesReloader >> commonAttributeNames [
+	^ LeContent leJsonV4AttributeMapping 
+		collect: [ :aMapping |
+			aMapping key ]
 ]
 
 { #category : #'accessing - mappings' }
@@ -83,7 +90,7 @@ LeContentAttributesReloader >> reloadCommonMetadataFromContent: aContent [
 	"Reload only the common attributes defined inside the mappings.
 	These are the attributes common among all snippets or pages."
 	| attributeMapping |
-	self assertCanUpdateFomContent: aContent.
+	self assertCanUpdateFromContent: aContent.
 	
 	attributeMapping := self commonMetadataAttributeMappings.
 	self 
@@ -95,7 +102,7 @@ LeContentAttributesReloader >> reloadCommonMetadataFromContent: aContent [
 LeContentAttributesReloader >> reloadFromContent: aSnippet [
 	"Reload all the relavant attributes of the content defined inside the mappings."
 	| attributeMapping |
-	self assertCanUpdateFomContent: aSnippet.
+	self assertCanUpdateFromContent: aSnippet.
 	
 	attributeMapping := self relevantAttributeMappings.
 	self 
@@ -134,9 +141,34 @@ LeContentAttributesReloader >> updateAttributeForMapping: aMapping fromContent: 
 ]
 
 { #category : #update }
+LeContentAttributesReloader >> updateCommonMetadataMappingsIn: attributeMapping  fromContent: aContent [
+	| commonAttributeNames commonMappings |
+	commonAttributeNames := self commonAttributeNames.
+	commonMappings := attributeMapping select: [ :each |
+		commonAttributeNames includes: each key ].
+	
+	commonMappings do: [ :aMapping |
+		self 
+			updateAttributeForMapping: aMapping
+			fromContent: aContent ]
+]
+
+{ #category : #update }
 LeContentAttributesReloader >> updateForMappings: attributeMapping  fromContent: aContent [
 	self resetChangedAttributes.
-	attributeMapping do: [ :aMapping |
+	
+	self updateSpecificMappingsIn: attributeMapping  fromContent: aContent.
+	self updateCommonMetadataMappingsIn: attributeMapping  fromContent: aContent.
+]
+
+{ #category : #update }
+LeContentAttributesReloader >> updateSpecificMappingsIn: attributeMapping  fromContent: aContent [
+	| commonAttributeNames specificMappings |
+	commonAttributeNames := self commonAttributeNames.
+	specificMappings := attributeMapping reject: [ :each |
+		commonAttributeNames includes: each key ].
+	
+	specificMappings do: [ :aMapping |
 		self 
 			updateAttributeForMapping: aMapping
 			fromContent: aContent ]
@@ -147,6 +179,6 @@ LeContentAttributesReloader >> updateStatusForAttributeNamed: anAttributeName [
 	(self ignoredAttributes includes:  anAttributeName) 
 		ifTrue: [ ^ 'Ignored' asRopedText foreground: Color gray ].
 	(self changedAttributes includes:  anAttributeName) 
-		ifTrue: [ ^ 'Changed' asRopedText foreground: Color blue muchDarker ].
+		ifTrue: [ ^ 'Changed' asRopedText foreground: Color red muchDarker ].
 	^ 'Equal' asRopedText foreground: Color green muchDarker
 ]

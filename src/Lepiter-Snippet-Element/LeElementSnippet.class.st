@@ -25,7 +25,12 @@ LeElementSnippet class >> contextMenuItemSpecification [
 	^ LeContextMenuItemSpecification new
 		priority: 4;
 		snippetClass: self;
-		title: 'Element'
+		title: self description
+]
+
+{ #category : #factory }
+LeElementSnippet class >> description [
+	^ 'Element'
 ]
 
 { #category : #factory }
@@ -73,6 +78,18 @@ LeElementSnippet >> acceptVisitor: aVisitor [
 	^ aVisitor visitElementSnippet: self
 ]
 
+{ #category : #converting }
+LeElementSnippet >> asPreviewElement [
+	"Copied from LeTextElement. Might not be correct."
+	| viewModel snippetElement |
+
+	viewModel := self asSnippetViewModel.
+	snippetElement := viewModel snippetView asElement.
+	snippetElement snippetViewModel: viewModel.
+	snippetElement padding: (BlInsets all: 10).
+	^ snippetElement
+]
+
 { #category : #accessing }
 LeElementSnippet >> asSnippetViewModel [
 	<return: #LeSnippetViewModel>
@@ -80,7 +97,14 @@ LeElementSnippet >> asSnippetViewModel [
 ]
 
 { #category : #accessing }
+LeElementSnippet >> caption [
+	"A future implementation of caption"
+	^ nil
+]
+
+{ #category : #accessing }
 LeElementSnippet >> codeHeight [
+	<return: #Number>
 	^ codeHeight
 ]
 
@@ -93,11 +117,13 @@ LeElementSnippet >> codeHeight: aNumber [
 	
 	self notifyAnnouncement: (LeElementSnippetCodeHeightChanged new
 		source: self;
-		snippet: self)
+		snippet: self;
+		codeHeight: codeHeight)
 ]
 
 { #category : #accessing }
 LeElementSnippet >> codeVisible [
+	<return: #Boolean>
 	^ codeVisible
 ]
 
@@ -110,11 +136,46 @@ LeElementSnippet >> codeVisible: aBoolean [
 
 	self notifyAnnouncement: (LeElementSnippetCodeVisibilityChanged new
 		source: self;
-		snippet: self)
+		snippet: self;
+		codeVisible: codeVisible)
+]
+
+{ #category : #updating }
+LeElementSnippet >> createEditCommandForElementHeight: anElementHeight [
+	^ self 
+		createEditCommandForElementHeight: anElementHeight 
+		codeHeight: self codeHeight
+]
+
+{ #category : #updating }
+LeElementSnippet >> createEditCommandForElementHeight: anElementHeight codeHeight: aCodeHeight [
+	| command |
+	command := self commandBuilder editSnippetStateCommand.
+	
+	(self elementHeight closeTo: anElementHeight) ifFalse: [
+		command snippetState
+			attributeNamed: #elementHeight setValue: anElementHeight ].
+	
+	(self codeHeight closeTo: aCodeHeight) ifFalse: [
+		command snippetState
+			attributeNamed: #codeHeight setValue: aCodeHeight ].
+
+	^ command
+]
+
+{ #category : #updating }
+LeElementSnippet >> createEditVisibilityCommandTo: aBoolean [ 
+	| command |
+	command := self commandBuilder editSnippetStateCommand.
+	command snippetState
+		attributeNamed: #codeVisible 
+		setValue: aBoolean.
+	^ command
 ]
 
 { #category : #accessing }
 LeElementSnippet >> elementHeight [
+	<return: #Number>
 	^ elementHeight
 ]
 
@@ -127,7 +188,8 @@ LeElementSnippet >> elementHeight: aNumber [
 	
 	self notifyAnnouncement: (LeElementSnippetElementHeightChanged new
 		source: self;
-		snippet: self)
+		snippet: self;
+		elementHeight: elementHeight)
 ]
 
 { #category : #initialization }
@@ -139,7 +201,64 @@ LeElementSnippet >> initialize [
 	codeVisible := true
 ]
 
+{ #category : #testing }
+LeElementSnippet >> isForLocalImage [
+	^ true
+]
+
 { #category : #initialization }
 LeElementSnippet >> newCoder [
 	^ GtPharoSnippetCoder new
+]
+
+{ #category : #testing }
+LeElementSnippet >> similarTo: anotherExampleSnippet [
+	^ self code = anotherExampleSnippet code
+		and: [ self codeHeight = anotherExampleSnippet codeHeight
+			and: [ self elementHeight = anotherExampleSnippet elementHeight
+				and: [ self codeVisible = anotherExampleSnippet codeVisible ] ] ]
+]
+
+{ #category : #printing }
+LeElementSnippet >> storeOn: aStream [
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new code: ';
+		print: self code;
+		nextPutAll: '; codeVisible: ';
+		print: self codeVisible;
+		nextPutAll: '; elementHeight: ';
+		print: self elementHeight;
+		nextPutAll: '; codeHeight: ';
+		print: self codeHeight;
+		nextPutAll: '; yourself)'
+]
+
+{ #category : #updating }
+LeElementSnippet >> updateIfRequiredCodeVisibility: aBoolean [
+	| command |
+	codeVisible = aBoolean
+		ifTrue: [ ^ self ].
+	
+	command := self createEditVisibilityCommandTo: aBoolean.
+	command execute 
+]
+
+{ #category : #updating }
+LeElementSnippet >> updateIfRequiredElementHeight: anElementHeight [ 
+	self 
+		updateIfRequiredElementHeight: anElementHeight 
+		codeHeight: self codeHeight
+]
+
+{ #category : #updating }
+LeElementSnippet >> updateIfRequiredElementHeight: anElementHeight codeHeight: aCodeHeight [
+	| command |
+	command := self 
+		createEditCommandForElementHeight: anElementHeight 
+		codeHeight: aCodeHeight.
+
+	command snippetState hasAttributes ifTrue: [
+		command execute ]
 ]

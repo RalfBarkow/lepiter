@@ -37,34 +37,90 @@ Class {
 		'snippetContent',
 		'snippetContainer',
 		'widgetContent',
-		'sidebarContainer',
-		'sidebarContent'
+		'sidebarStencil',
+		'sidebar',
+		'shouldShowSidebar',
+		'shouldShowBottomToolbar',
+		'shouldShowActionsOnFocus'
 	],
 	#category : #'Lepiter-UI-Snippet-Looks'
 }
 
-{ #category : #'private - accessing' }
-LeSnippetAptitude >> bottomToolbar [
-	^ bottomToolbar
-]
-
-{ #category : #'private - layout' }
+{ #category : #'private - bottom toolbar' }
 LeSnippetAptitude >> bottomToolbarMargin [
 	^ -8
 ]
 
-{ #category : #'private - layout' }
+{ #category : #'private - bottom toolbar' }
 LeSnippetAptitude >> computeBottomToolbarMargin [
 	^ BlInsets bottom: self bottomToolbarMargin + self internalBorderBottomOffset
+]
+
+{ #category : #'private - accessing' }
+LeSnippetAptitude >> contentContainer [
+	^ self snippetContainer
+]
+
+{ #category : #'private - bottom toolbar' }
+LeSnippetAptitude >> createBottomToolbar [
+	^ self newAddSnippetDropdown
+		elevation: (BlRelativeElevation elevation: 20);
+		constraintsDo: [ :c | 
+			c ignoreByLayout.
+			c ignored horizontal alignCenter.
+			c ignored vertical alignBottom ]
+]
+
+{ #category : #'private - sidebar' }
+LeSnippetAptitude >> createSidebar [
+	^ sidebarStencil asElement
+]
+
+{ #category : #'private - bottom toolbar' }
+LeSnippetAptitude >> ensureBottomToolbar [
+	"Make sure that the bottom toolbar is initialized and added to the snippet content container.
+	We initialize the bottom toolbar lazily the first time it appears"
+
+	bottomToolbar ifNil: [ bottomToolbar := self createBottomToolbar ].
+
+	(self contentContainer hasChild: bottomToolbar)
+		ifTrue: [ ^ self ].
+
+	self contentContainer addChild: bottomToolbar as: #bottomToolbar
+]
+
+{ #category : #'private - sidebar' }
+LeSnippetAptitude >> ensureSidebar [
+	"Make sure that the sidebar is initialized and added to the snippet content container.
+	We initialize the sidebar lazily the first time it appears"
+
+	sidebar ifNil: [ sidebar := self createSidebar ].
+
+	(widgetContent hasChild: sidebar)
+		ifTrue: [ ^ self ].
+
+	widgetContent addChild: sidebar as: #sidebarContainer
 ]
 
 { #category : #private }
 LeSnippetAptitude >> hideActions [
 	areActionsVisible := false.
 
-	self bottomToolbar visibility: BlVisibility hidden.
-	self sidebarContainer visibility: BlVisibility hidden.
+	self hideSidebar.
+	self hideBottomToolbar
+]
+
+{ #category : #'private - bottom toolbar' }
+LeSnippetAptitude >> hideBottomToolbar [
+	bottomToolbar ifNil: [ ^ self ].
+	bottomToolbar visibility: BlVisibility hidden.
 	self updateBottomToolbarMargin
+]
+
+{ #category : #'private - sidebar' }
+LeSnippetAptitude >> hideSidebar [
+	sidebar ifNil: [ ^ self ].
+	sidebar visibility: BlVisibility hidden
 ]
 
 { #category : #initialization }
@@ -77,85 +133,62 @@ LeSnippetAptitude >> initialize [
 	areActionsVisible := false.
 
 	self initializeElements.
-	
-	snippetContent := BlElement new size: 0@0.
-	sidebarContent := BlElement new size: 0@0.
+
+	snippetContent := BlElement new size: 0 @ 0.
+	sidebarStencil := [ BlElement new
+			layout: BlLinearLayout vertical;
+			preventMouseEvents;
+			constraintsDo: [ :c | 
+				c horizontal fitContent.
+				c vertical matchParent ] ] asStencil.
 
 	self addChangeProperty: #(widget margin) with: [ margin ].
 
-	self addChangeAddChildAs: #(content) with: [ widgetContent ].
-	self addChangeAddChildAs: #(content snippetContainer) with: [ snippetContainer ].
-	self addChangeAddChildAs: #(content sidebarContainer) with: [ sidebarContainer ].
+	self
+		addChangeAddChildAs: #(content)
+		with: [ widgetContent addChild: snippetContainer as: #snippetContainer.
 
-	self addChangeAddChildAs: #(snippetContainer snippetContent) with: [ snippetContent ].
-	self addChangeAddChildAs: #(snippetContainer bottomToolbar) with: [ self bottomToolbar ].
+			self contentContainer addChild: snippetContent.
 
-	self addChangeAddChildAs: #(sidebarContainer sidebarContent) with: [ sidebarContent ].
+			widgetContent ].
+
 	self addChangeProperty: #(snippetContainer padding) with: [ padding ].
 
-	self add: (BrLayoutResizerAptitude new
-		inherit;
-		inherit: [ widgetContent ]).
+	self add: (BrLayoutResizerAptitude new inherit: [ widgetContent ]).
+	widgetContent
+		addAptitude: (BrLayoutResizerAptitude new inherit: [ snippetContainer ]).
+	self contentContainer
+		addAptitude: (BrLayoutResizerAptitude new inherit: [ snippetContent ]).
 
-	widgetContent addAptitude: (BrLayoutResizerAptitude new
-		inherit;
-		inherit: [ snippetContainer ]).
-		
-	snippetContainer addAptitude: (BrLayoutResizerAptitude new
-		inherit;
-		inherit: [ snippetContent ]).
-		
-	snippetContainer addShortcut: (BlShortcutWithAction new
-		combination: (BlKeyCombination builder shift; primary; key: BlKeyboardKey return; build);
-		action: [ :anEvent :aShortcut | 
-			bottomToolbar dispatchEvent: BrDropdownShowWish new ]).
+	self
+		add: (BrLazyStyleCommonAptitude new
+				when: BlElementState focused | BlElementState hovered
+					style: [ :aStyle | 
+						self shouldShowActionsOnFocus
+							ifTrue: [ aStyle do: [ self showActions ] after: [ self hideActions ] ] ];
+				when: BlElementState focused & BlElementState hovered
+					style: [ :aStyle | aStyle do: [ self visuallyFocus ] after: [ self visuallyUnfocusAndUnhover ] ];
+				when: BlElementState focused & BlElementState hovered not
+					style: [ :aStyle | aStyle do: [ self visuallyFocus ] after: [ self visuallyUnfocusAndUnhover ] ];
+				when: BlElementState hovered & BlElementState focused not
+					style: [ :aStyle | aStyle do: [ self visuallyHover ] after: [ self visuallyUnfocusAndUnhover ] ]).
+
+	snippetContainer
+		addShortcut: (BlShortcutWithAction new
+				combination: (BlKeyCombination builder
+						shift;
+						primary;
+						key: BlKeyboardKey return;
+						build);
+				action: [ :anEvent :aShortcut | self showBottomToolbarDropdown ]).
 
 	self hideActions
 ]
 
 { #category : #initialization }
-LeSnippetAptitude >> initializeBottomToolbar [
-	bottomToolbar := self newAddSnippetDropdown
-		elevation: (BlRelativeElevation elevation: 20);
-		constraintsDo: [ :c | 
-			c ignoreByLayout.
-			c ignored horizontal alignCenter.
-			c ignored vertical alignBottom ]
-]
-
-{ #category : #initialization }
 LeSnippetAptitude >> initializeElements [
-	self initializeBottomToolbar.
 	self initializeWidgetContent.
-	self initializeSnippetContainer.
-	self initializeSidebarContainer
-]
-
-{ #category : #initialization }
-LeSnippetAptitude >> initializeListeners [
-	super initializeListeners.
-	"self
-		when: BlMouseEnterEvent
-		do: [ self onMouseEnter ].
-	self
-		when: BlMouseLeaveEvent
-		do: [ self onMouseLeave ]."
-	self 
-		when: BlFocusInEvent 
-		do: [ self onFocusReceived ].
-	self 
-		when: BlFocusOutEvent 
-		do: [ self onFocusLost ].
-]
-
-{ #category : #initialization }
-LeSnippetAptitude >> initializeSidebarContainer [
-	sidebarContainer := BlElement new
-		layout: BlLinearLayout vertical;
-		preventMouseEvents;
-		constraintsDo: [ :c |
-			c horizontal fitContent.
-			c vertical matchParent ]
+	self initializeSnippetContainer
 ]
 
 { #category : #initialization }
@@ -191,43 +224,35 @@ LeSnippetAptitude >> margin: anObject [
 	margin := anObject
 ]
 
-{ #category : #private }
-LeSnippetAptitude >> mayHideActions [
-	"Only hide actions if the widget does not have focus"
-	self widgetDo: [ :aWidget |
-		aWidget hasFocus ifTrue: [ ^ self ] ].
-	self hideActions
-]
-
 { #category : #'instance creation' }
 LeSnippetAptitude >> newAddSnippetDropdown [
 	<return: #BlElement>
-	
 	| aButton |
+	
 	aButton := self newPlusElement.
 	aButton
-		addAptitude: (BrGlamorousWithDropdownAptitude
+		addAptitude: (BrGlamorousWithExplicitDropdownAptitude
 			handle: [ 
 				self newPlusElement
 					aptitude: BrIconAptitude;
 					background: BrGlamorousColors secondaryHeaderBackgroundColor ]
 			content: [
 				GtSpotterDropdownButtonStencil new
-					valuable: (LeContextMenuSpotterStart new database: widget database);
+					valuable: (LeContextMenuSpotterStart new 
+						database: widget database);
 					extent: [ 300 @ 400 ];
 					spotterModelDo: [ :aSpotter |
 						aSpotter hidePreview.
-						aSpotter announcer
+						aSpotter announcer weak
 							when: GtSpotterExitAnnouncement
-							do: [ :anAnnouncement | self widgetDo: [ :aWidget | 
-									aWidget snippetViewModel focused: true from: nil ] ]
-						 ];
-					actOn: [ :anActOnEvent :aMenuItem :theButton | 
+							send: #onSpotterExitAnnouncement:
+							to: self ];
+					objectActOn: [ :anActOnEvent :aMenuItem :theButton | 
 						self snippetBelowRequested: aMenuItem asSnippet.
 						anActOnEvent beActed ];
 					spotterElementFor: aButton ]
-			aptitudeDo: [ :anAnchoredLook | 
-				anAnchoredLook background: BrGlamorousColors secondaryHeaderBackgroundColor ]) doNotHideWidget.
+			containerDo: [ :aMenuContainer | 
+				aMenuContainer background: BrGlamorousColors secondaryHeaderBackgroundColor ]) doNotHideWidget.
 	^ aButton
 ]
 
@@ -236,28 +261,13 @@ LeSnippetAptitude >> newPlusElement [
 	<return: #BlElement>
 
 	^ GtInspectorRoundButtonStencil small asElement
-		icon: (GtInspectorPlusIconStencil add thickness: 1; radius: 4; asElement);
+		icon: (BrPlusIconStencil add thickness: 1; radius: 4; asElement);
 		yourself
 ]
 
-{ #category : #callbacks }
-LeSnippetAptitude >> onFocusLost [
-	self hideActions
-]
-
-{ #category : #callbacks }
-LeSnippetAptitude >> onFocusReceived [
-	self showActions
-]
-
-{ #category : #callbacks }
-LeSnippetAptitude >> onMouseEnter [
-	self showActions
-]
-
-{ #category : #callbacks }
-LeSnippetAptitude >> onMouseLeave [
-	self mayHideActions
+{ #category : #'private - event management' }
+LeSnippetAptitude >> onSpotterExitAnnouncement: anAnnouncement [
+	self widgetDo: [ :aWidget | aWidget snippetViewModel focused: true from: nil ]
 ]
 
 { #category : #'api - accessing' }
@@ -272,31 +282,70 @@ LeSnippetAptitude >> padding: aBlInsets [
 	padding := aBlInsets
 ]
 
+{ #category : #accessing }
+LeSnippetAptitude >> shouldShowActionsOnFocus [
+	^ shouldShowActionsOnFocus ifNil: [ true ]
+]
+
+{ #category : #accessing }
+LeSnippetAptitude >> shouldShowActionsOnFocus: aBoolean [
+	shouldShowActionsOnFocus := aBoolean.
+	(shouldShowActionsOnFocus or: [ areActionsVisible ])
+		ifFalse: [ self showActions ]
+]
+
+{ #category : #accessing }
+LeSnippetAptitude >> shouldShowBottomToolbar [
+	^ shouldShowBottomToolbar ifNil: [ true ]
+]
+
+{ #category : #accessing }
+LeSnippetAptitude >> shouldShowBottomToolbar: aBoolean [
+	shouldShowBottomToolbar := aBoolean
+]
+
+{ #category : #accessing }
+LeSnippetAptitude >> shouldShowSidebar [
+	^ shouldShowSidebar ifNil: [ true ]
+]
+
+{ #category : #accessing }
+LeSnippetAptitude >> shouldShowSidebar: aBoolean [
+	shouldShowSidebar := aBoolean
+]
+
 { #category : #private }
 LeSnippetAptitude >> showActions [
 	areActionsVisible := true.
 
-	self bottomToolbar visibility: BlVisibility visible.
-	self sidebarContainer visibility: BlVisibility visible.
+	self showSidebar.
+	self showBottomToolbar
+]
+
+{ #category : #'private - bottom toolbar' }
+LeSnippetAptitude >> showBottomToolbar [
+	self shouldShowBottomToolbar ifFalse: [ ^ self ].
+	self ensureBottomToolbar.
+	bottomToolbar visibility: BlVisibility visible.
 	self updateBottomToolbarMargin
 ]
 
-{ #category : #'private - accessing' }
-LeSnippetAptitude >> sidebarContainer [
-	^ sidebarContainer
+{ #category : #'private - bottom toolbar' }
+LeSnippetAptitude >> showBottomToolbarDropdown [
+	self ensureBottomToolbar.
+	bottomToolbar dispatchEvent: BrDropdownShowWish new
+]
+
+{ #category : #'private - sidebar' }
+LeSnippetAptitude >> showSidebar [
+	self shouldShowSidebar ifFalse: [ ^ self ].
+	self ensureSidebar.
+	sidebar visibility: BlVisibility visible
 ]
 
 { #category : #'api - accessing' }
-LeSnippetAptitude >> sidebarContainer: anElement [
-	sidebarContainer := anElement.
-	sidebarContainer visibility: (areActionsVisible
-		ifTrue: [ BlVisibility visible ]
-		ifFalse: [ BlVisibility hidden ] )
-]
-
-{ #category : #'api - accessing' }
-LeSnippetAptitude >> sidebarContent: anElement [
-	sidebarContent := anElement
+LeSnippetAptitude >> sidebarStencil: aStencil [
+	sidebarStencil := aStencil asStencil
 ]
 
 { #category : #private }
@@ -317,7 +366,20 @@ LeSnippetAptitude >> snippetContent: aSnippetContent [
 	snippetContent := aSnippetContent
 ]
 
-{ #category : #'private - layout' }
+{ #category : #'private - bottom toolbar' }
 LeSnippetAptitude >> updateBottomToolbarMargin [
+	bottomToolbar ifNil: [ ^ self ].
 	bottomToolbar margin: self computeBottomToolbarMargin
+]
+
+{ #category : #private }
+LeSnippetAptitude >> visuallyFocus [
+]
+
+{ #category : #private }
+LeSnippetAptitude >> visuallyHover [
+]
+
+{ #category : #private }
+LeSnippetAptitude >> visuallyUnfocusAndUnhover [
 ]

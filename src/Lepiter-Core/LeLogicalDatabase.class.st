@@ -83,8 +83,28 @@ LeLogicalDatabase >> addDB: aLeDatabase [
 	self assert: [ primaryDB ~= aLeDatabase and: [ playgroundDB ~= aLeDatabase ] ].
 	self assert: aLeDatabase isDatabase.
 
-	registeredDBs := registeredDBs copyWith: aLeDatabase.
+	self basicAddDB: aLeDatabase.
 	^ self setupAddedDB: aLeDatabase
+]
+
+{ #category : #'api - convenience' }
+LeLogicalDatabase >> addKnowledgebaseFromDirectory: aFileReference [
+	"Create a new database instance and add as registered DB"
+
+	self assert: [ aFileReference isNotNil ].
+	self assert: [ aFileReference exists ].
+
+	"Do not add same database twice"
+	self databasesDo: [ :eachDB | 
+		(eachDB hasMonitor
+			and: [ eachDB localStoreRootDirectory resolve = aFileReference resolve ])
+			ifTrue: [ ^ self ] ].
+
+	self properties
+		addRegisteredDirectory: aFileReference;
+		save.
+
+	self reload
 ]
 
 { #category : #'api - adding / removing' }
@@ -104,6 +124,22 @@ LeLogicalDatabase >> announcer [
 LeLogicalDatabase >> anyOne [
 
 	^ primaryDB anyOne
+]
+
+{ #category : #'api - accessing' }
+LeLogicalDatabase >> asyncAllSnippets [
+	^ self databases
+		inject: #() asAsyncStream
+		into: [ :sum :each | sum merge: each asyncAllSnippets ]
+]
+
+{ #category : #accessing }
+LeLogicalDatabase >> asyncPagesForWord: aString [
+	| results |
+	results := #() asAsyncStream.
+	self
+		databasesDo: [ :each | results := results merge: (each asyncPagesForWord: aString) ].
+	^ results
 ]
 
 { #category : #'api - accessing' }
@@ -142,6 +178,14 @@ LeLogicalDatabase >> at: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock f
 ]
 
 { #category : #'private - accessing' }
+LeLogicalDatabase >> basicAddDB: aLeDatabase [
+	"Add a DB without any processing."
+
+	self assert: [ aLeDatabase isNotNil ].
+	registeredDBs := registeredDBs copyWith: aLeDatabase.
+]
+
+{ #category : #'private - accessing' }
 LeLogicalDatabase >> basicPlaygroundDB: aLeDatabase [
 	"Set the primary DB without any processing."
 
@@ -155,6 +199,14 @@ LeLogicalDatabase >> basicPrimaryDB: aLeDatabase [
 
 	self assert: [ aLeDatabase isNotNil ].
 	primaryDB := aLeDatabase.
+]
+
+{ #category : #'private - accessing' }
+LeLogicalDatabase >> basicRemoveDB: aLeDatabase [
+	"Remove a DB without any processing."
+
+	self assert: [ aLeDatabase isNotNil ].
+	registeredDBs := registeredDBs reject: [ :each | each = aLeDatabase ].
 ]
 
 { #category : #'api - accessing' }
@@ -200,6 +252,16 @@ LeLogicalDatabase >> databaseNamed: aDatabaseName [
 ]
 
 { #category : #accessing }
+LeLogicalDatabase >> databaseNamed: aDatabaseName ifNone: noneBlock [
+	"Answer the database with the supplied name"
+
+	<return: #LeDatabase>
+	^ self databases
+		detect: [ :db | db databaseName = aDatabaseName ]
+		ifNone: noneBlock
+]
+
+{ #category : #accessing }
 LeLogicalDatabase >> databaseWithID: aUUIDString [
 	"Answer the database with the supplied id"
 	<return: #LeDatabase>
@@ -234,12 +296,8 @@ LeLogicalDatabase >> databaseWithID: aUUIDString ifNone: noneBlock [
 LeLogicalDatabase >> databases [
 	"Answer the receiver's databases in evaluation order, without duplicates"
 
-	^ Array new: registeredDBs size + 2 streamContents: [ :stream |
-		stream nextPut: primaryDB.
-		playgroundDB == primaryDB ifFalse:
-			[ stream nextPut: playgroundDB ].
-		registeredDBs do: [ :db |
-			stream nextPut: db ] ] .
+	^ Array streamContents: [ :stream |
+		self databasesDo: [ :db | stream nextPut: db ] ]
 ]
 
 { #category : #'api - accessing' }
@@ -277,9 +335,13 @@ LeLogicalDatabase >> explicitLinksCount [
 { #category : #accessing }
 LeLogicalDatabase >> gtDatabasesFor: aView [
 	<gtView>
-	^ aView list
+	^ aView columnedList
 		title: 'Databases';
-		items: [ self databases ]
+		items: [ self databases sorted: [ :each | each pageCount ] descending ];
+		column: 'Name' text: #databaseName;
+		column: 'Pages' text: [:db | db pageCount ];
+		column: 'Snippets' text: [:db | db snippetsCount ];
+		column: 'Links' text: [:db | db linksCount ]
 ]
 
 { #category : #'api - testing' }
@@ -303,6 +365,14 @@ LeLogicalDatabase >> hasDatabaseAt: aFileReference [
 		db localStoreRootDirectory resolve = resolvedFr ifTrue: 
 			[ ^ true ] ].
 	^ false
+]
+
+{ #category : #'api - testing' }
+LeLogicalDatabase >> hasDatabaseNamed: aDatabaseName [
+	^ self databases
+		detect: [ :db | db databaseName = aDatabaseName ]
+		ifFound: [ true ]
+		ifNone: [ false ]
 ]
 
 { #category : #'api - testing' }
@@ -391,7 +461,7 @@ LeLogicalDatabase >> loadFromProperties [
 
 	self primaryDB: properties primaryDatabase.
 	
-	properties playgroundDatabaseDirectory = self primaryDB localStoreRootDirectory
+	properties playgroundDatabaseUrl = self primaryDB storeLocation
 		ifFalse: [ self playgroundDB: properties playgroundDatabase ]
 		ifTrue: [ self playgroundDB: self primaryDB ].
 	
@@ -478,6 +548,39 @@ LeLogicalDatabase >> pageNames [
 	^ pageNames
 ]
 
+{ #category : #accessing }
+LeLogicalDatabase >> pageWithID: pageId [
+	| uid |
+
+	uid := pageId isString 
+		ifTrue: [ UUID fromString36: pageId ]
+		ifFalse: [ pageId ].
+	self pagesDo: [ :page | page uid = uid ifTrue: [ ^ page ] ].
+	NotFound signalFor: pageId.
+]
+
+{ #category : #accessing }
+LeLogicalDatabase >> pageWithID: pageId ifAbsent: absentBlock [
+	| uid |
+
+	uid := pageId isString 
+		ifTrue: [ UUID fromString36: pageId ]
+		ifFalse: [ pageId ].
+	self pagesDo: [ :page | page uid = uid ifTrue: [ ^ page ] ].
+	^ absentBlock value.
+]
+
+{ #category : #accessing }
+LeLogicalDatabase >> pageWithID: pageId ifPresent: presentBlock ifAbsent: absentBlock [
+	| uid |
+
+	uid := pageId isString 
+		ifTrue: [ UUID fromString36: pageId ]
+		ifFalse: [ pageId ].
+	self pagesDo: [ :page | page uid = uid ifTrue: [ ^ presentBlock value: page ] ].
+	^ absentBlock value.
+]
+
 { #category : #'api - query' }
 LeLogicalDatabase >> pageWithLinkTo: aTargetReference ifAbsent: anAbsentBlock [ 
 	^ self 
@@ -522,7 +625,8 @@ LeLogicalDatabase >> pagesByDate [
 { #category : #'api - accessing' }
 LeLogicalDatabase >> pagesByDateToShow [
 	^ self pagesByDate reject: [ :aPage |
-		aPage type isPharoClassPageType  ]
+		aPage type isPharoClassPageType or: [
+		aPage type isProxyClassPageType ] ]
 ]
 
 { #category : #'private - accessing' }
@@ -558,28 +662,40 @@ LeLogicalDatabase >> playgroundDB [
 
 { #category : #accessing }
 LeLogicalDatabase >> playgroundDB: aLeDatabase [
-
+	| anOldPlayground shouldUnsubscribe |
 	self assert: [ aLeDatabase isNotNil ].
 	
+	anOldPlayground := playgroundDB.
+	
+	aLeDatabase = anOldPlayground ifTrue: [ ^ self ].
+	
 	"Ensure the same instance is used if the primary and playground DBs are the same"
-	(aLeDatabase hasMonitor and: [ primaryDB hasMonitor
-	and: [ aLeDatabase localStoreRootDirectory = primaryDB localStoreRootDirectory ] ]) ifTrue: 
-		[ playgroundDB := primaryDB.
+	aLeDatabase storeLocation = primaryDB storeLocation ifTrue: 
+		[ (anOldPlayground isNotNil and: [ anOldPlayground ~= primaryDB ]) ifTrue: 
+			[ self unsubscribeFromDatabase: anOldPlayground.
+			playgroundDB := primaryDB.
+			self notifyDatabaseRemoved: anOldPlayground ].
+
+		playgroundDB := primaryDB.
 		^ self ].
+						
+	shouldUnsubscribe := anOldPlayground isNotNil and: [ anOldPlayground ~= primaryDB ].
 
-	(playgroundDB isNotNil and: [ playgroundDB ~= primaryDB ]) ifTrue: 
-		[ self unsubscribeFromDatabase: playgroundDB.
-		self notifyDatabaseRemoved: playgroundDB ].
-	playgroundDB := aLeDatabase.
+	self basicPlaygroundDB: aLeDatabase.
 	playgroundDB parent: self.
-	self subscribeToDatabase: aLeDatabase.
-	self notifyDatabaseAdded: aLeDatabase.
 
+	shouldUnsubscribe ifTrue: [
+		self unsubscribeFromDatabase: anOldPlayground.
+		self notifyDatabaseRemoved: anOldPlayground ].
+	
+	aLeDatabase = primaryDB ifFalse: [
+		self subscribeToDatabase: aLeDatabase.
+		self notifyDatabaseAdded: aLeDatabase ].
+	
 	"Cross-database links are updated by the target page.
 	Update links from existing databases that reference the newly loaded database."
-	self pagesDo: [ :page | page onAddedToDatabase ].
-
-
+	aLeDatabase = primaryDB ifFalse: [
+		self pagesDo: [ :page | page onAddedToDatabase ] ]
 ]
 
 { #category : #accessing }
@@ -632,31 +748,25 @@ LeLogicalDatabase >> registeredDBs: anArray [
 ]
 
 { #category : #'startup-shutdown' }
-LeLogicalDatabase >> reload [ 
-
-	LeLogicalDatabaseReload new 
-		database: self;
-		reload
-]
-
-{ #category : #'startup-shutdown' }
-LeLogicalDatabase >> reloadRequestFrom: aLeDatabase [
+LeLogicalDatabase >> reloadRequestFrom: aLeDatabase withErrorStrategy: aContentReloadErrorStrategy [
 	"All concrete databases will be requested to reload at Pharo session startup.
 	Only reload the receiver once - when the primary DB requests it."
 
-	aLeDatabase == primaryDB ifTrue: [ self reload ]
+	aLeDatabase == primaryDB ifTrue: [ 
+		self reloadWithErrorStrategy: aContentReloadErrorStrategy ]
 ]
 
 { #category : #accessing }
 LeLogicalDatabase >> removeDB: aLeDatabase [
-	"Remove the supplied database from the receiver.
-	Only registered databases can be removed."
+	"Remove the supplied database from the receiver"
 
-	self assert: [ registeredDBs includes: aLeDatabase ].
+	self assert: [ (registeredDBs includes: aLeDatabase) or: [
+		aLeDatabase = primaryDB or: [
+		aLeDatabase = playgroundDB ] ] ].
 
 	self unsubscribeFromDatabase: aLeDatabase.
 
-	registeredDBs := registeredDBs reject: [ :each | each = aLeDatabase ].
+	self basicRemoveDB: aLeDatabase.
 	aLeDatabase unload.
 
 	self notifyDatabaseRemoved: aLeDatabase.
@@ -670,10 +780,10 @@ LeLogicalDatabase >> saveProperties [
 
 	properties isNull ifTrue: [ ^ self ].
 	properties 
-		primaryDatabaseDirectory: primaryDB localStoreRootDirectory;
-		playgroundDatabaseDirectory: playgroundDB localStoreRootDirectory;
-		registeredDatabaseDirectories: (registeredDBs collect:
-			[ :each | each localStoreRootDirectory ]).
+		primaryDatabaseUrl: primaryDB storeLocation;
+		playgroundDatabaseUrl: playgroundDB storeLocation;
+		registeredDatabaseUrls: (registeredDBs collect:
+			[ :each | each storeLocation ]).
 
 ]
 
@@ -740,6 +850,15 @@ LeLogicalDatabase >> subscribeToDatabase: aDatabase [
 { #category : #accessing }
 LeLogicalDatabase >> tableOfContents [
 	^ primaryDB tableOfContents
+]
+
+{ #category : #accessing }
+LeLogicalDatabase >> tableOfContentsNodes [
+	<return: #Collection of: #LeTableOfContentsNode>
+	| page |
+	page := self tableOfContents.
+	page ifNil: [ ^ #() ].
+	^ (LeTableOfContentsVisitor tocForPage: page) asOrderedCollection.
 ]
 
 { #category : #'api - accessing' }

@@ -6,7 +6,7 @@ Class {
 		'updater',
 		'substitutions'
 	],
-	#category : #'Lepiter-Store-JsonV4'
+	#category : 'Lepiter-Store-JsonV4'
 }
 
 { #category : #initialization }
@@ -32,7 +32,6 @@ LeJsonV4000SnippetVisitor >> updatedSnippetString [
 	| currentPosition |
 
 	substitutions ifEmpty: [ ^ snippetString ].
-	substitutions size > 1 ifTrue: [ self halt ].
 	currentPosition := 1.
 	^ String streamContents: [ :stream |
 		substitutions do: [ :each |

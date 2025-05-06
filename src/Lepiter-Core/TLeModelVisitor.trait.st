@@ -21,7 +21,7 @@ TLeModelVisitor >> visitContent: aLeContent [
 
 	aLeContent children do: [ :child |
 		child acceptVisitor: self ].
-
+	^ aLeContent
 ]
 
 { #category : #visiting }
@@ -30,6 +30,10 @@ TLeModelVisitor >> visitDatabase: aLeDatabase [
 	aLeDatabase pagesDo: [ :page |
 		page acceptVisitor: self ].
 
+]
+
+{ #category : #visiting }
+TLeModelVisitor >> visitDoubleBracketLink: aDoubleBracketLink [
 ]
 
 { #category : #visiting }
@@ -54,6 +58,10 @@ TLeModelVisitor >> visitModel: aLeModel [
 TLeModelVisitor >> visitPage: aLePage [
 
 	^ self visitContent: aLePage
+]
+
+{ #category : #visiting }
+TLeModelVisitor >> visitPageAnnotation: aDoubleBracketLink [
 ]
 
 { #category : #visiting }
@@ -87,6 +95,11 @@ TLeModelVisitor >> visitSlide: aLeSlide [
 ]
 
 { #category : #visiting }
+TLeModelVisitor >> visitSlideshowSnippet: aLeSlideshowSnippet [
+	^ self visitTextualSnippet: aLeSlideshowSnippet.
+]
+
+{ #category : #visiting }
 TLeModelVisitor >> visitSnippet: aLeSnippet [
 
 	^ self visitContent: aLeSnippet
@@ -111,8 +124,14 @@ TLeModelVisitor >> visitTextSnippet: aLeTextSnippet [
 ]
 
 { #category : #visiting }
+TLeModelVisitor >> visitTextualLink: aDoubleBracketLink [
+]
+
+{ #category : #visiting }
 TLeModelVisitor >> visitTextualSnippet: aLeTextualSnippet [
 
+	aLeTextualSnippet allOutgoingLinks do: [ :link | 
+		link acceptVisitor: self ].
 	^ self visitSnippet: aLeTextualSnippet
 ]
 

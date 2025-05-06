@@ -1,21 +1,21 @@
 Extension { #name : #LeContextMenuSpotterStart }
 
 { #category : #'*Lepiter-Snippet-Picture' }
-LeContextMenuSpotterStart >> gtSpotterForPictureFor: aStep [
+LeContextMenuSpotterStart >> gtSpotterForPictureFor: aSearch [
 	<gtSearch>
-	aStep listProcessor
-		priority: 2;
+
+	^ aSearch explicit
 		title: 'Add picture snippet';
+		priority: 2;
 		itemName: #title;
-		filter: GtNullFilter
-			item: [ :filter :context | | pictureString |
-				pictureString := self spotterPictureFileStringFor: context textTrimmed.
-				StringSignal emit: 'P: ', pictureString asString, ' from: ', context textTrimmed asString.
-				pictureString ifNotNil:
-					[ filter value: (LeContextMenuItemValuableSpecification new
-						valuable: [ LePictureSnippet new urlString: pictureString ];
-						title: pictureString) ] ];
-		wantsToDisplayOnEmptyQuery: false
+		search: [ :aContext |
+			((aContext searchQuery asAsyncFuture asAsyncStream
+				collect: [ :aQuery | self spotterPictureFileStringFor: aQuery trimBoth ])
+				select: #notNil)
+				collect: [ :aPicturePath |
+					LeContextMenuItemValuableSpecification new
+						valuable: [ LePictureSnippet new urlString: aPicturePath ];
+						title: aPicturePath ] ]
 ]
 
 { #category : #'*Lepiter-Snippet-Picture' }
@@ -27,12 +27,12 @@ LeContextMenuSpotterStart >> spotterPictureFileStringFor: pictureString [
 
 	extension := (pictureString copyAfterLast: $.) asLowercase.
 	mimeType := ZnMimeType forFilenameExtension: extension.
-	mimeType main = #image ifFalse: [ ^ nil ].
+	mimeType main = 'image' ifFalse: [ ^ nil ].
 	urlUtility := GtUrlStringUtility new
 		rootDirectory: self database localStoreRootDirectory;
 		urlString: pictureString.
 	^ urlUtility isValid ifTrue: 
-		[ (pictureString beginsWith: #attachments) ifTrue:
+		[ (pictureString beginsWith: 'attachments') ifTrue:
 			"The file is already in the database, don't add it a second time"
 			[ pictureString ]
 		ifFalse: [ url := urlUtility urlString asZnUrl.

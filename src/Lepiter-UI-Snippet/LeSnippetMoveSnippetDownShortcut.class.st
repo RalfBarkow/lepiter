@@ -16,5 +16,5 @@ LeSnippetMoveSnippetDownShortcut >> name [
 
 { #category : #evaluation }
 LeSnippetMoveSnippetDownShortcut >> performOnEditor: aBrTextEditor snippet: aLeSnippetElement dueTo: aShortcutEvent [
-	aLeSnippetElement snippetViewModel moveDown
+	aLeSnippetElement snippetViewModel requestMoveDown
 ]

@@ -96,6 +96,8 @@ LeLocalStorage >> savePage: aPage inFile: aPageFile [
 				<< ' curtailed';
 				lf; flush.
 			self error: 'Lepiter DB page save curtailed' ] ].
+	LeReloadOptimization ifEnabled: [
+		aPage storageHash: (LeBinaryContentsHash fromFileReference: aPageFile) ].
 	LeLocalStoreSignal new
 		pageTitle: aPage title;
 		operation: #save;
@@ -134,8 +136,8 @@ LeLocalStorage >> write: jsonObject toJsonFile: aFileReference [
 	"Write the supplied JSON object to the given file."
 
 	aFileReference writeStreamDo: [ :stream |
-		(NeoJSONWriter new on: (ZnNewLineWriterStream on: stream)) 
+		(NeoJSONWriter on: (ZnNewLineWriterStream on: stream)) 
+			newLine: Character cr asString;
 			prettyPrint: true;
 			nextPut: jsonObject ].
-
 ]

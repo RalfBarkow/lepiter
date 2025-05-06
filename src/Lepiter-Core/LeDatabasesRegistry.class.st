@@ -1,17 +1,16 @@
 Class {
 	#name : #LeDatabasesRegistry,
-	#superclass : #LeModel,
+	#superclass : #LeBasicDatabasesRegistry,
 	#traits : 'TGtUniqueInstance',
 	#classTraits : 'TGtUniqueInstance classTrait',
-	#instVars : [
-		'defaultLogicalDatabase'
-	],
-	#category : #'Lepiter-Core-Model'
+	#category : #'Lepiter-Core-Registry'
 }
 
 { #category : #accessing }
 LeDatabasesRegistry class >> defaultLogicalDatabase [
-
+	<gtExample>
+	<noTest>
+	
 	^ self uniqueInstance defaultLogicalDatabase
 ]
 
@@ -27,6 +26,12 @@ LeDatabasesRegistry class >> defaultPrimaryDatabase [
 	^ self uniqueInstance defaultPrimaryDatabase
 ]
 
+{ #category : #accessing }
+LeDatabasesRegistry class >> getDatabaseByName: aDatabaseName [
+	^ LeDatabasesRegistry uniqueInstance defaultLogicalDatabase databases
+		detect: [ :db | db databaseName = aDatabaseName ]
+]
+
 { #category : #'private - hooks' }
 LeDatabasesRegistry class >> onRemoveUniqueInstance: anInstance [
 	"Stop any open databases before removing the instance"
@@ -35,70 +40,38 @@ LeDatabasesRegistry class >> onRemoveUniqueInstance: anInstance [
 ]
 
 { #category : #accessing }
-LeDatabasesRegistry >> clearDefaultLogicalDatabase [
-
-	self stopMonitoring.
-	^ defaultLogicalDatabase := nil
-]
-
-{ #category : #accessing }
-LeDatabasesRegistry >> currentLoadedDefaultLogicalDatabase [
-
-	^ defaultLogicalDatabase 
-]
-
-{ #category : #accessing }
 LeDatabasesRegistry >> defaultLogicalDatabase [
 
 	^ defaultLogicalDatabase ifNil: [ defaultLogicalDatabase := self loadDefaultLogicalDatabase ]
 ]
 
-{ #category : #accessing }
-LeDatabasesRegistry >> defaultLogicalDatabase: anObject [
-	defaultLogicalDatabase := anObject
-]
-
-{ #category : #accessing }
-LeDatabasesRegistry >> defaultPlaygroundDatabase [
-
-	^ self defaultLogicalDatabase playgroundDB
-]
-
-{ #category : #accessing }
-LeDatabasesRegistry >> defaultPrimaryDatabase [
-
-	^ self defaultLogicalDatabase primaryDB
+{ #category : #private }
+LeDatabasesRegistry >> ensureDatabase [
+	"Ensure there is a database configured. If a database already is set do nothing.
+	In case there is no database configure one for GT."
+	
+	defaultLogicalDatabase ifNotNil: [ ^ defaultLogicalDatabase ].
+	^ self setupForGlamorousToolkit
 ]
 
 { #category : #testing }
-LeDatabasesRegistry >> hasDatabasesLoaded [
-	^ defaultLogicalDatabase notNil
+LeDatabasesRegistry >> hasDefaultLogicalDatabase [
+
+	^ defaultLogicalDatabase isNotNil
 ]
 
 { #category : #private }
 LeDatabasesRegistry >> initializeForGlamorousToolkit [
 	| databaseProperties |
 	self assert: [ defaultLogicalDatabase isNil ].
+	
 	databaseProperties := LeLogicalDatabaseProperties defaultForGlamorousToolkit.
 	self defaultLogicalDatabase: databaseProperties logicalDatabase
 	
 ]
 
 { #category : #private }
-LeDatabasesRegistry >> loadDefaultLogicalDatabase [
-
-	^ LeLogicalDatabaseProperties default logicalDatabase
-]
-
-{ #category : #private }
 LeDatabasesRegistry >> setupForGlamorousToolkit [
 	self initializeForGlamorousToolkit.
 	^ self currentLoadedDefaultLogicalDatabase 
-]
-
-{ #category : #'startup-shutdown' }
-LeDatabasesRegistry >> stopMonitoring [
-
-	defaultLogicalDatabase ifNotNil: 
-		[ defaultLogicalDatabase stopMonitoring ]
 ]

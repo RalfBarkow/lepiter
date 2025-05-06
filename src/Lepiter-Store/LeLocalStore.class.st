@@ -22,22 +22,19 @@ The store is responsible for ensuring that an attachments directory exists in th
 "
 Class {
 	#name : #LeLocalStore,
-	#superclass : #Object,
+	#superclass : #LeDatabaseStore,
+	#traits : 'TGtMacroFileReferenceEncoding',
+	#classTraits : 'TGtMacroFileReferenceEncoding classTrait',
 	#instVars : [
 		'localRoot',
-		'storage',
-		'database',
-		'dbProperties',
 		'attachmentsDirectory'
 	],
 	#category : #'Lepiter-Store-LocalJSON-Store'
 }
 
-{ #category : #'instance creation' }
-LeLocalStore class >> current [
-	"Answer an instance of the receiver with the current storage format"
-
-	^ self forJsonV4
+{ #category : #accessing }
+LeLocalStore class >> attachmentsDirectoryName [
+	^ 'attachments'
 ]
 
 { #category : #accessing }
@@ -60,6 +57,152 @@ LeLocalStore class >> forJsonV4 [
 	^ self new storage: LeLocalJsonV4Storage new
 ]
 
+{ #category : #attachments }
+LeLocalStore >> addAttachmentByCopy: aFileReference [
+	"Copy the attached file to the receiver's DB and answer the relative path string to the file"
+
+	<return: #String>
+	^ self addAttachmentByCopy: aFileReference withId: UUID new
+]
+
+{ #category : #attachments }
+LeLocalStore >> addAttachmentByCopy: aFileReference withId: aUuid [
+	"Copy the attached file to the receiver's DB and answer the relative path string to the file"
+
+	<return: #String>
+	| attachmentFileReference attachmentDirectory |
+	database assertNotReadOnly.
+
+	attachmentDirectory := self
+			attachmentDirectoryAndMetadataFor: aFileReference
+			usingId: aUuid.
+	attachmentFileReference := attachmentDirectory / aFileReference basename.
+	aFileReference copyTo: attachmentFileReference.
+	^ (attachmentFileReference relativeTo: localRoot) fullName
+]
+
+{ #category : #attachments }
+LeLocalStore >> addAttachmentByMove: aFileReference [
+	"Move the attached file to the receiver's DB and answer the relative path string to the file"
+	<return: #String>
+	| attachmentFileReference attachmentDirectory |
+
+	database assertNotReadOnly.
+
+	attachmentDirectory := self attachmentDirectoryAndMetadataFor:
+		                       aFileReference usingId: UUID new.
+	attachmentFileReference := attachmentDirectory
+	                           / aFileReference basename.
+	aFileReference resolve copy moveTo: attachmentFileReference resolve.
+	^ (attachmentFileReference relativeTo: localRoot) fullName
+]
+
+{ #category : #attachments }
+LeLocalStore >> addAttachmentWithContent: aString named: aName [
+	"Create an attachment to the receiver's DB and answer the relative path string to the file"
+	<return: #String>
+	^ self addAttachmentWithContent: aString named: aName withId: UUID new
+]
+
+{ #category : #attachments }
+LeLocalStore >> addAttachmentWithContent: aContents named: aName withId: aUuid [
+	| attachmentFileReference attachmentDirectory |
+
+	database assertNotReadOnly.
+
+	attachmentDirectory := self attachmentDirectoryAndMetadataFor:
+		                       aName asFileReference usingId: aUuid.
+	attachmentFileReference := attachmentDirectory / aName asString.
+	attachmentFileReference
+		binaryWriteStreamDo: [ :aStream | aStream nextPutAll: aContents ].
+	^ (attachmentFileReference relativeTo: localRoot)
+		  fullName 
+]
+
+{ #category : #attachments }
+LeLocalStore >> attachmentBinaryStream: attachmentPath do: aBlock [
+	"Answer a stream on the binary contents of the supplied attachment path"
+	| attachmentFileReference |
+
+	attachmentFileReference := database resolveDbFile: attachmentPath.
+	self assert: attachmentFileReference exists.
+	^ attachmentFileReference binaryReadStreamDo: aBlock
+]
+
+{ #category : #attachments }
+LeLocalStore >> attachmentDirectories [
+
+	^ attachmentsDirectory exists
+		  ifTrue: [ attachmentsDirectory directories ]
+		  ifFalse: [ #(  ) ]
+]
+
+{ #category : #attachments }
+LeLocalStore >> attachmentDirectoryAndMetadataFor: aFileReference usingId: aUuid [
+	"Create the attachment directory and populate the metadata for the supplied file reference.
+	Answer the directory."
+	| fileUID attachmentDirectory attachment |
+
+	self assert: [ aFileReference basename ~= LeAttachment basename ] description: [ 
+		String streamContents: [ :aStream | 
+			aStream nextPutAll: 'Cannot create attachment directory and metadata. The filename is '.
+			aStream nextPutAll: aFileReference basename.
+			aStream nextPutAll: '.' 
+		]
+	].
+	fileUID := aUuid asString36.
+	attachmentDirectory := attachmentsDirectory / fileUID.
+	attachmentDirectory exists ifTrue: [ 
+		LeLocalAttachmentAlreadyExist new
+			basename: aFileReference basename;
+			uuid: fileUID;
+			signal
+	].
+	
+	attachmentDirectory ensureCreateDirectory.
+	attachment := LeAttachment new
+		originalReference: aFileReference asFileReference;
+		uploadDate: DateAndTime now;
+		uploadedBy: self userEmail.
+	attachment saveTo: attachmentDirectory for: database.
+	^ attachmentDirectory resolve
+]
+
+{ #category : #attachments }
+LeLocalStore >> attachmentProperties: attachmentPath [
+	"Answer a stream on the binary contents of the supplied attachment path"
+	| attachmentFileReference |
+
+	attachmentFileReference := database resolveDbFile: attachmentPath.
+	self assert: attachmentFileReference exists.
+	^ LeAttachment loadFrom: attachmentFileReference parent / LeAttachment basename
+]
+
+{ #category : #attachments }
+LeLocalStore >> attachmentUtf8Stream: attachmentPath do: aBlock [
+	"Answer a stream on the binary contents of the supplied attachment path"
+	| attachmentFileReference |
+
+	attachmentFileReference := database resolveDbFile: attachmentPath.
+	self assert: attachmentFileReference exists.
+	^ attachmentFileReference readStreamDo: aBlock
+]
+
+{ #category : #attachments }
+LeLocalStore >> attachmentWithDataForId: aUuid [
+	| fileUID attachmentDirectory properties |
+	
+	fileUID := aUuid asString36.
+	attachmentDirectory := attachmentsDirectory / fileUID.
+	attachmentDirectory exists ifFalse: [ ^ nil ].
+	
+	properties := LeAttachment loadFromFolder: attachmentDirectory.
+	^ LeAttachmentWithDiskStorageData new
+		id: fileUID;
+		database: self database;
+		metadata: properties
+]
+
 { #category : #accessing }
 LeLocalStore >> attachmentsDirectory [
 	^ attachmentsDirectory
@@ -71,36 +214,18 @@ LeLocalStore >> attachmentsDirectory: anObject [
 ]
 
 { #category : #accessing }
-LeLocalStore >> database [
-	^ database
+LeLocalStore >> attachmentsDirectoryName [
+	^ self class attachmentsDirectoryName
 ]
 
 { #category : #accessing }
-LeLocalStore >> database: anObject [
-	database := anObject
+LeLocalStore >> dbPropertiesFile [
+	^ localRoot / self propertiesBasename
 ]
 
 { #category : #'accessing - db properties' }
-LeLocalStore >> databaseName [
-	<return: #String or: nil>
-
-	^ self dbProperties at: #databaseName 
-		ifPresent: [ :anArray | anArray ]
-		ifAbsent: [ self databaseNameFromLocalRoot ]
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> databaseName: aString [
-	"Store the database name"
-
-	aString ifNil: [ 
-		self dbProperties removeKey: #databaseName ifAbsent: [ ].
-		^ self savePropertiesDictionary: dbProperties ].
-	self updateProperty: #databaseName value: aString asString 
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> databaseNameFromLocalRoot [
+LeLocalStore >> defaultDatabaseName [
+	"Answer the name to be used if one hasn't been explicitly set"
 	<return: #String>
 
 	| theSegments reversedSegments usedSegments |
@@ -125,64 +250,30 @@ LeLocalStore >> databaseNameFromLocalRoot [
 ]
 
 { #category : #accessing }
-LeLocalStore >> dbProperties [
-
-	^ dbProperties ifNil: 
-		[ dbProperties := self loadPropertiesDictionary.
-		dbProperties
-			at: #schema
-			ifAbsent: [ self dbSchema: 'V3' ].
-		dbProperties
-			at: #uuid 
-			ifAbsent: 
-				[ dbProperties at: #uuid put: UUID new asString.
-				self savePropertiesDictionary: dbProperties ].
-		dbProperties ]
-]
-
-{ #category : #accessing }
-LeLocalStore >> dbSchema [
-
-	^ LeDbVersion fromString: (self dbProperties at: #schema)
-]
-
-{ #category : #'private - accessing' }
-LeLocalStore >> dbSchema: aLeDbVersion [ 
-
-
-	self dbProperties at: #schema put: aLeDbVersion asString.
-	self savePropertiesDictionary: dbProperties
-]
-
-{ #category : #accessing }
 LeLocalStore >> explicitLinksFileReference [
 	^ self storage explicitLinksFileOrNilIn: self localRoot
 ]
 
 { #category : #private }
-LeLocalStore >> fileReferenceFrom: aString [
-	"Answer a FileReference or FileLocator from the supplied string.
-	FileLocator origins + 'dbParentDirectory' are available as formatted strings, e.g.
-		{home}/lepiter
-	is the equivalent of
-		FileLocator home / 'lepiter'"
-	| namedDirectories regex name path |
-
-	namedDirectories := (FileLocator supportedOrigins collect: [ :origin | 
-		origin -> (FileLocator origin: origin) ]) asDictionary.
-	namedDirectories at: #dbParentDirectory put: localRoot parent.
-	regex := '\{([a-zA-Z]+)\}(.*)' asRegex.
-	^ (regex matches: aString) ifTrue: 
-		[ name := regex subexpression: 2.
-		path := regex subexpression: 3.
-		namedDirectories at: name
-			ifPresent: [ :locator | locator resolve: path allButFirst ]
-			ifAbsent: [ self error: 'Unknown directory: ', name printString ] ]
-	ifFalse:
-	 	[ aString asFileReference ].
+LeLocalStore >> explicitLinksHash [
+	<return: #LeBinaryContentsHash or: nil>
+	storage withExplicitLinksFileIn: localRoot do: [ :aFile |
+		[
+			^ LeBinaryContentsHash fromFileReference: aFile.
+		 ]
+			on: LeDBLoadError 
+			fork: [ :ex | ex pass ] ].
+	^ nil
 ]
 
-{ #category : #private }
+{ #category : #accessing }
+LeLocalStore >> explicitLinksOrNil [
+
+	^ self explicitLinksFileReference ifNotNil:
+		[ :file | storage loadPageFrom: file ].
+]
+
+{ #category : #'private - db properties' }
 LeLocalStore >> fileReferenceString: aFileReferenceStringOrNil [
 	"Answer the string form of the supplied reference"
 
@@ -196,6 +287,37 @@ LeLocalStore >> fileReferenceString: aFileReferenceStringOrNil [
 						aFileReferenceStringOrNil fileSystem 
 							printPath: aFileReferenceStringOrNil path 
 							on: stream ] ] ] ]
+]
+
+{ #category : #attachments }
+LeLocalStore >> findAttachmentById: aUuid [
+	| attachmentDirectory fileUID targetFile |
+	fileUID := aUuid asString36.
+	attachmentDirectory := attachmentsDirectory / fileUID.
+
+	attachmentDirectory exists
+		ifFalse: [ ^ LeLocalAttachmentDoesNotExist new
+				uuid: aUuid;
+				signal ].
+
+	targetFile := attachmentDirectory files
+			detect: [ :aFile | aFile basename ~= LeAttachment basename ]
+			ifNone: [ ^ LeLocalAttachmentMissingFile new
+					uuid: aUuid;
+					directory: attachmentDirectory;
+					signal ].
+
+	^ targetFile binaryContents
+]
+
+{ #category : #accessing }
+LeLocalStore >> gtActionDBPropertiesFileFor: anAction [
+	<gtAction>
+	^ anAction button
+		tooltip: 'Browse lepiter.properties file';
+		priority: 10;
+		icon: BrGlamorousIcons folder;
+		action: [ :b | b phlow spawnObject: self dbPropertiesFile ]
 ]
 
 { #category : #ui }
@@ -214,24 +336,33 @@ LeLocalStore >> gtNameMappingFor: aView [
 		send: [ :each | each value ]
 ]
 
-{ #category : #ui }
-LeLocalStore >> gtPropertiesFor: aView [
-	"Provide a simple view of the current properties"
-	<gtView>
+{ #category : #attachments }
+LeLocalStore >> hasAttachmentWithId: aUuid [
+	| attachmentDirectory fileUID |
 
-	^ aView forward 
-		title: 'Properties';
-		priority: 15;
-		object: [ self dbProperties ];
-		view: #gtItemsFor:
+	database assertNotReadOnly.
+
+	fileUID := aUuid asString36.
+	attachmentDirectory := attachmentsDirectory / fileUID.
+	
+	^ attachmentDirectory exists
 ]
 
-{ #category : #'private - db properties' }
-LeLocalStore >> loadDatabasePropertiesIn: aDatabase [
-	"Load the lepiter.properties file and update the database"
-
-	self dbProperties at: #userEmail ifPresent:
-		[ :email | database userEmail: email ].
+{ #category : #private }
+LeLocalStore >> loadExplicitLinks [
+	
+	storage withExplicitLinksFileIn: localRoot do: [ :aFile |
+		[
+			| theExplicitLinks aHash |
+			theExplicitLinks := storage loadFromFile: aFile.
+			LeReloadOptimization ifEnabled: [
+				aHash := LeBinaryContentsHash fromFileReference: aFile.
+				theExplicitLinks storageHash: aHash ].
+			^ theExplicitLinks
+		 ]
+			on: LeDBLoadError 
+			fork: [ :ex | ex pass ] ].
+	^ nil
 ]
 
 { #category : #'private - db properties' }
@@ -240,9 +371,11 @@ LeLocalStore >> loadPropertiesDictionary [
 	| propertiesFile |
 
 	propertiesFile := localRoot / self propertiesBasename.
-	propertiesFile exists ifFalse: [ ^ Dictionary new ].
+	propertiesFile exists ifFalse: [ ^ self newPropertiesDictionary ].
 	^ propertiesFile readStreamDo: [ :stream |
-		STONJSON fromStream: stream ].
+		(NeoJSONReader on: stream)
+			mapClass: GtStringContentDictionary;
+			next ].
 
 ]
 
@@ -256,7 +389,25 @@ LeLocalStore >> localRoot: aFileReference [
 	"Set the localRoot for the storage"
 
 	localRoot := aFileReference.
-	attachmentsDirectory := localRoot / 'attachments'.
+	attachmentsDirectory := localRoot / self attachmentsDirectoryName
+]
+
+{ #category : #attachments }
+LeLocalStore >> lookupAttachmentDirectoryAndMetadataFor: aFileReference usingId: aUuid [
+	"Create the attachment directory and populate the metadata for the supplied file reference.
+	Answer the directory."
+	| fileUID attachmentDirectory attachment |
+
+	self assert: [ aFileReference basename ~= LeAttachment basename ].
+	fileUID := aUuid asString36.
+	attachmentDirectory := attachmentsDirectory / fileUID.
+	self assert: attachmentDirectory exists.
+	attachment := LeAttachment new
+		originalReference: aFileReference asFileReference;
+		uploadDate: DateAndTime now;
+		uploadedBy: self userEmail.
+	attachment saveTo: attachmentDirectory for: database.
+	^ attachmentDirectory resolve
 ]
 
 { #category : #accessing }
@@ -277,6 +428,34 @@ LeLocalStore >> pageFilenameForId: aLePage [
 	^ storage pageFilenameForUid: aLePage
 ]
 
+{ #category : #accessing }
+LeLocalStore >> pageHashFor: aLePage [
+	<return: #LeBinaryContentsHash or: nil>
+
+	| aFile |
+	aFile := localRoot / (self pageFilename: aLePage).
+	aFile ifNil: [ ^ nil ].
+	aFile exists ifFalse: [ ^ nil ].
+	
+	^ LeBinaryContentsHash fromFileReference: aFile
+]
+
+{ #category : #accessing }
+LeLocalStore >> pagesFromStore [
+	"Answer a collection of all pages loaded from the store"
+
+	^ (storage dbFilesIn: self localRoot)
+		collect: [ :file | 
+			| aPage |
+			aPage := storage loadFromFile: file.
+			aPage ifNotNil: [
+				LeReloadOptimization ifEnabled: [
+					| aHash |
+					aHash := LeBinaryContentsHash fromFileReference: file.
+					aPage storageHash: aHash ] ].
+			aPage ]
+]
+
 { #category : #'accessing - db properties' }
 LeLocalStore >> preloadScript [
 	<return: #FileReference or: nil>
@@ -294,42 +473,11 @@ LeLocalStore >> preloadScript: aFileReferenceOrNil [
 		value: (self fileReferenceString: aFileReferenceOrNil)
 ]
 
-{ #category : #private }
-LeLocalStore >> primitiveReload [
-	"Reload the receiver.
-	Flush any data that may have changed on-disk since the last (re)load."
-
-	dbProperties := nil.
-]
-
 { #category : #accessing }
 LeLocalStore >> propertiesBasename [
 	"Answer the basename of the receiver's database properties file"
 
 	^ LepiterCoreDefaults databasePropertiesBasename
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> propertyAt: aSymbol [
-	<return: #String or: #Dictionary>
-
-	^ self dbProperties at: aSymbol
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> propertyAt: aSymbol ifAbsent: absentBlock [
-	<return: #String or: #Dictionary>
-
-	^ self dbProperties at: aSymbol ifAbsent: absentBlock
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> propertyAt: aSymbol ifPresent: presentBlock ifAbsent: absentBlock [
-
-	^ self dbProperties 
-		at: aSymbol 
-		ifPresent: presentBlock
-		ifAbsent: absentBlock
 ]
 
 { #category : #loading }
@@ -366,59 +514,47 @@ LeLocalStore >> savePageNow: aPage [
 		ifFalse: [ storage savePage: aPage in: localRoot ]
 ]
 
-{ #category : #'accessing - db properties' }
-LeLocalStore >> savePersonalInformation [
-	<return: #Boolean>
-
-	^ self dbProperties at: #savePersonalInformation 
-		ifPresent: [ :aBoolean | aBoolean ]
-		ifAbsent: [ false ]
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> savePersonalInformation: aBooleanOrNil [
-	"Update the flag on whether to store personal information in the database.
-	nil = default, which is false (see #savePersonalInformaation)"
-
-	self updateProperty: #savePersonalInformation value: aBooleanOrNil 
-]
-
 { #category : #'private - db properties' }
 LeLocalStore >> savePropertiesDictionary: properties [
 	"Save the lepiter.properties file contents"
 	| propertiesFile |
 
 	propertiesFile := (localRoot / self propertiesBasename) resolve.
-	propertiesFile ensureDelete.
+	localRoot ensureCreateDirectory.
+	propertiesFile ensureDelete ensureCreateFile.
 	^ propertiesFile writeStreamDo: [ :stream |
 		STONJSON put: properties onStreamPretty: (ZnNewLineWriterStream on: stream) ].
 
 ]
 
 { #category : #accessing }
-LeLocalStore >> storage [
-	^ storage
+LeLocalStore >> signalDuplicatePage: aPage reason: aString originalException: originalException [
+	| file corruptFileReference error |
+
+	file := localRoot / (storage pageFilename: aPage).
+	corruptFileReference := (file withExtension: 'corrupt') nextVersion.
+	"UIManager default 
+		inform: 'Lepiter: Unable to load: '
+			, corruptFileReference basename
+			, ' in ', corruptFileReference parent fullName
+			, ' due to a duplicate page ID'."
+	file resolve renameTo: corruptFileReference basename.
+	error := LeDBLoadError new.
+	error properties at: #fileReference put: corruptFileReference.
+	error
+		pageTitle: aPage title;
+		pageUid: aPage uid;
+		reason: aString;
+		originalException: nil;
+		signal
 ]
 
 { #category : #accessing }
-LeLocalStore >> storage: anObject [
-	storage := anObject
-]
+LeLocalStore >> storeLocation [
+	"Answer the receiver's directory.  This is used to compare whether two databases can be considered the same, i.e. have the same underlying store.  If no directory is configured, answer self so the comparison is false."
 
-{ #category : #'accessing - db properties' }
-LeLocalStore >> tableOfContentsPageID [
-	"Answer the page UUID for the Table Of Contents, or nil if not set"
-
-	^ self dbProperties at: #tableOfContents 
-		ifPresent: [ :uuidString | UUID fromString36: uuidString ]
-		ifAbsent: [ nil ]
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> tableOfContentsPageID: aUUID [
-	"Store the page to be used as a Table of Contents"
-
-	self updateProperty: #tableOfContents value: (aUUID ifNotNil: #asString36) 
+	localRoot ifNil: [ ^ self ].
+	^ localRoot asLepiterZnUrl.
 ]
 
 { #category : #accessing }
@@ -427,31 +563,17 @@ LeLocalStore >> titleFilename: aString [
 	^ storage titleFilename: aString
 ]
 
-{ #category : #'private - db properties' }
-LeLocalStore >> updateProperty: propertyName value: aJSONObject [
-	| properties |
+{ #category : #attachments }
+LeLocalStore >> updateAttachmentWithContent: aContents named: aName withId: aUuid [
+	| attachmentFileReference attachmentDirectory |
 
-	properties := self dbProperties.
-	aJSONObject ifNil: 
-		[ properties removeKey: propertyName ifAbsent: [ ].
-		^ self savePropertiesDictionary: properties ].
-	(properties at: propertyName ifAbsent: [nil]) = aJSONObject ifTrue: [ ^ self ].
-	properties at: propertyName put: aJSONObject.
-	self savePropertiesDictionary: properties.
-]
+	database assertNotReadOnly.
 
-{ #category : #'accessing - db properties' }
-LeLocalStore >> uuid [ 
-	"Answer the UUID of the receiver's DB"
-	<return: #UUID>
-
-	^ UUID fromString: (self dbProperties at: #uuid)
-]
-
-{ #category : #'accessing - db properties' }
-LeLocalStore >> uuidString [
-	"Answer the UUID of the receiver's DB in String36 format"
-	<return: #String>
-
-	^ self uuid asString36
+	attachmentDirectory := self lookupAttachmentDirectoryAndMetadataFor:
+		                       aName asFileReference usingId: aUuid.
+	attachmentFileReference := attachmentDirectory / aName asString.
+	attachmentFileReference
+		binaryWriteStreamDo: [ :aStream | aStream nextPutAll: aContents ].
+	^ (attachmentFileReference relativeTo: localRoot)
+		  fullName 
 ]

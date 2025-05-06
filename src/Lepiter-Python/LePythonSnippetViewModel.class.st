@@ -23,6 +23,28 @@ LePythonSnippetViewModel >> initializeCoderAddOns: aCoderViewModel [
 		addShortcut: (LeSnippetMoveSnippetDownShortcut new combination: (self keyboardShortcut: #MoveSnippetDown))
 ]
 
+{ #category : #'api - bindings' }
+LePythonSnippetViewModel >> onSelfObjectChanged [
+	coderViewModel selfObject: sharedContext selfObject
+]
+
+{ #category : #'filter view' }
+LePythonSnippetViewModel >> parserClass [
+	^ PythonParser
+]
+
+{ #category : #'api - bindings' }
+LePythonSnippetViewModel >> sharedSnippetContext: aLeSharedSnippetContext [
+	sharedContext unsubscribe: self.
+
+	super sharedSnippetContext: aLeSharedSnippetContext.
+	self onSelfObjectChanged.
+
+	aLeSharedSnippetContext
+		whenSelfObjectChangedSend: #onSelfObjectChanged
+		to: self
+]
+
 { #category : #accessing }
 LePythonSnippetViewModel >> snippetElementClass [
 	^ LePythonSnippetElement

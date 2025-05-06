@@ -35,7 +35,7 @@ LeLinkPageTextualTitleReference >> isReferencingContent: aLeContent [
 	
 	^ (super isReferencingContent: aLeContent) and: [
 			aLeContent isPage and: [
-				aLeContent title = self pageTitle ] ]
+				aLeContent title sameContentAs: self pageTitle ] ]
 ]
 
 { #category : #accessing }
@@ -69,6 +69,15 @@ LeLinkPageTextualTitleReference >> resolveInDatabase: aDatabase [
 			"Ignore the fast the the page is not found.
 			The link will remain unresolved. " ].
 	
+]
+
+{ #category : #accessing }
+LeLinkPageTextualTitleReference >> status [
+	self isResolved ifTrue: [ ^ LeLinkReferenceStatus exists ].
+
+	^ self isExistingPage
+		ifTrue: [ LeLinkReferenceStatus exists ]
+		ifFalse: [ LeLinkReferenceStatus notFound ]
 ]
 
 { #category : #accessing }

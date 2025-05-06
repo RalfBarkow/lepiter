@@ -271,8 +271,8 @@ LeChangesSnippetViewModel >> subscribeToSnippetModel [
 	<modelSubscriber: #snippet>
 	<generatedFrom: #'TGtRobocoderWithObjectTraitTemplate>>#subscribeToObjectTemplate'>
 	super subscribeToSnippetModel.
-	self snippetModel when: LeChangesSnippetFileNameChanged send: #onSnippetFileNameChanged: to: self.
-	self snippetModel when: LeChangesSnippetPreviewHeightChanged send: #onSnippetPreviewHeightChanged: to: self.
+	self snippetModel weak when: LeChangesSnippetFileNameChanged send: #onSnippetFileNameChanged: to: self.
+	self snippetModel weak when: LeChangesSnippetPreviewHeightChanged send: #onSnippetPreviewHeightChanged: to: self.
 ]
 
 { #category : #'api - changes' }
@@ -331,9 +331,9 @@ LeChangesSnippetViewModel >> updateChanges [
 		ifTrue: [ ^ self unsetChanges ].
 
 	fileNameWithExtension := (self snippetModel fileName
-		endsWith: GtDocumentConstants changesFileExtension)
+		endsWith: LepiterConstants changesFileExtension)
 		ifTrue: [ self snippetModel fileName ]
-		ifFalse: [ self snippetModel fileName , GtDocumentConstants changesFileExtension ].
+		ifFalse: [ self snippetModel fileName , LepiterConstants changesFileExtension ].
 
 	aFile := self resolveFileName: fileNameWithExtension.
 

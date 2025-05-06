@@ -57,6 +57,12 @@ LeUnknownSnippet class >> leJsonV4MappingFor: aNeoJSONMapper [
 				map neoJsonOn: jsonWriter ] ]
 ]
 
+{ #category : #serializing }
+LeUnknownSnippet class >> leJsonV4Name [
+
+	^ #unknownSnippet
+]
+
 { #category : #visiting }
 LeUnknownSnippet >> acceptVisitor: aVisitor [
 
@@ -86,9 +92,10 @@ LeUnknownSnippet >> gtStringFor: aView [
 
 	jsonString ifNil: [ ^ aView empty ].
 	^ aView textEditor
-		title: 'JSON String';
+		title: 'JSON string';
 		priority: 10;
-		aptitude: BrGlamorousRegularEditorAptitude;
+		aptitude: BrGlamorousCodeEditorAptitude;
+		styler: JSONParser gtStyler;
 		text: [ self jsonString ]
 ]
 
@@ -96,6 +103,11 @@ LeUnknownSnippet >> gtStringFor: aView [
 LeUnknownSnippet >> initialize [
 	super initialize.
 	jsonString = ''.
+]
+
+{ #category : #testing }
+LeUnknownSnippet >> isUnknownSnippet [ 
+	^ true
 ]
 
 { #category : #'api - accessing' }
@@ -141,7 +153,10 @@ LeUnknownSnippet >> markdownOn: stream level: anInteger [
 { #category : #printing }
 LeUnknownSnippet >> printOn: aStream [
 	super printOn: aStream.
+	
+	jsonString ifNil: [ ^ self ].
 	jsonString ifEmpty: [ ^ self ].
+	
 	aStream 
 		nextPutAll: '(';
 		nextPutAll: jsonString;
@@ -149,29 +164,47 @@ LeUnknownSnippet >> printOn: aStream [
 ]
 
 { #category : #'private - updating' }
+LeUnknownSnippet >> reloadAttributesFromContent: aLeContent [
+	"Update only the jsonString.
+	No other metadata needs to be update for an unknown snippet, as that
+	snippet is created on-the-fly by the importer."
+
+	| changed metaDataChanged |
+	changed := false.
+	jsonString = aLeContent jsonString
+		ifFalse: [ self jsonString: aLeContent jsonString.
+			changed := true ].
+	metaDataChanged := self reloadCommonMetadataFromContent: aLeContent.
+	^ metaDataChanged or: [ changed ]
+]
+
+{ #category : #'private - updating' }
 LeUnknownSnippet >> reloadFromContent: aLeSnippet [
 	"Reload the receiver from the supplied snippet"
-	| changed index myParent |
 
 	"If the snippet is now known, replace myself with the new snippet.
 	Save my current parent since it will be nilled out while removing me."
-	aLeSnippet class = self class ifFalse:
-		[ myParent := parent.
+	aLeSnippet class = self class ifFalse: [ 
+		| myParent index |
+		myParent := parent.
 		index := myParent children indexOf: self.
 		self removeSelf.
 		myParent addSnippet: aLeSnippet beforeIndex: index.
 		^ true ].
 
-	"It's still unknown, update the children snippets and the jsonString.
-	No other metadata needs to be update for an unknown snippet, as that
-	snippet is created on-the-fly by the importer."
-	self reloadFromChildren: aLeSnippet children.
-	
-	changed := false.
-	jsonString = aLeSnippet jsonString ifFalse: 
-		[ self jsonString: aLeSnippet jsonString.
-		changed := true ].
-	^ changed
+	"It's still unknown, update the children snippets and its properties."
+	^ super reloadFromContent: aLeSnippet
+]
+
+{ #category : #printing }
+LeUnknownSnippet >> storeOn: aStream [
+
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' jsonString: '.
+	self jsonString storeOn: aStream.
+	aStream nextPut: $)
 ]
 
 { #category : #'api - accessing' }

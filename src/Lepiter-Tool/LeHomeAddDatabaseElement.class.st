@@ -12,7 +12,11 @@ LeHomeAddDatabaseElement >> addNewDatabaseInDirectory: aDirectory [
 	| aDatabase aFileLocator |
 	aFileLocator := aDirectory gtWithClosestFileLocatorParent.
 	aDatabase := LeLocalStoreLoad current loadAndMonitorFrom: aFileLocator.
+	
 	self database addDB: aDatabase.
+	
+	LeDatabasesRegistry defaultLogicalDatabase properties 
+		addRegisteredDirectory: aFileLocator.
 ]
 
 { #category : #'private - accessing' }
@@ -45,7 +49,7 @@ LeHomeAddDatabaseElement >> initialize [
 	
 	self addChildFirst: self buttonElement as: #list.
 	
-	self addAptitude: (BrLayoutResizerAptitude inherit
+	self addAptitude: (BrLayoutResizerAptitude new
 		anyToFitContent: self buttonElement)
 ]
 
@@ -58,7 +62,7 @@ LeHomeAddDatabaseElement >> initializeButtonElement [
 		label: 'New Database';
 		disable.
 		
-	aDropdownLook := BrGlamorousWithDropdownAptitude
+	aDropdownLook := BrGlamorousWithExplicitDropdownAptitude
 			handle: [
 				BrButton new
 					icon: BrGlamorousIcons add;
@@ -76,6 +80,7 @@ LeHomeAddDatabaseElement >> initializeButtonElement [
 								self addNewDatabaseInDirectory: aDirectory ] ];
 					buttonLabel: 'Add database';
 					exact: self extent;
+					addAptitude: BrGlamorousPopoverResizableAptitude new;
 					padding: (BlInsets all: 20);
 					matchParent ].
 		

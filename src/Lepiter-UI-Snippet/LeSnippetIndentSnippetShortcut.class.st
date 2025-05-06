@@ -16,5 +16,5 @@ LeSnippetIndentSnippetShortcut >> name [
 
 { #category : #evaluation }
 LeSnippetIndentSnippetShortcut >> performOnEditor: aBrTextEditor snippet: aLeSnippetElement dueTo: aShortcutEvent [
-	aLeSnippetElement snippetViewModel indent
+	aLeSnippetElement snippetViewModel requestIndent
 ]

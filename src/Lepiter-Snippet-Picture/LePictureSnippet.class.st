@@ -2,7 +2,10 @@ Class {
 	#name : #LePictureSnippet,
 	#superclass : #LeSnippet,
 	#instVars : [
-		'urlString'
+		'urlString',
+		'caption',
+		'previewHeight',
+		'reference'
 	],
 	#category : #'Lepiter-Snippet-Picture-Snippet'
 }
@@ -13,7 +16,12 @@ LePictureSnippet class >> contextMenuItemSpecification [
 	^ LeContextMenuItemSpecification new
 		priority: 3;
 		snippetClass: self;
-		title: 'Picture'
+		title: self description
+]
+
+{ #category : #accessing }
+LePictureSnippet class >> description [
+	^ 'Picture'
 ]
 
 { #category : #factory }
@@ -27,6 +35,9 @@ LePictureSnippet class >> leJsonV3AttributeMapping [
 
 	^ super leJsonV3AttributeMapping
 		add: (#urlString -> #url);
+		add: (#caption -> #caption);
+		add: (#previewHeight -> #previewHeight);
+		add: (#reference -> #reference);
 		yourself
 ]
 
@@ -41,6 +52,9 @@ LePictureSnippet class >> leJsonV4AttributeMapping [
 
 	^ super leJsonV4AttributeMapping
 		add: (#urlString -> #url);
+		add: (#caption -> #caption);
+		add: (#previewHeight -> #previewHeight);
+		add: (#reference -> #reference);
 		yourself
 ]
 
@@ -62,21 +76,92 @@ LePictureSnippet >> asSnippetViewModel [
 	^ LePictureSnippetViewModel new snippetModel: self
 ]
 
+{ #category : #accessing }
+LePictureSnippet >> attachmentNames [
+	self urlStringUtility isFile ifFalse: [ ^ #() ].
+	(self urlString beginsWith: LeLocalStore attachmentsDirectoryName) ifFalse: [ ^ #() ].
+
+	^ Array with: self urlString
+]
+
+{ #category : #accessing }
+LePictureSnippet >> caption [ 
+	<return: #String>
+
+	^ caption
+]
+
+{ #category : #accessing }
+LePictureSnippet >> caption: aString [
+
+	^ self caption: aString source: self
+]
+
+{ #category : #accessing }
+LePictureSnippet >> caption: aString source: aSource [
+	"Change the picture caption."
+	self
+		assert: [ aString notNil ]
+		description: [ 'Caption must be non-nil' ].
+
+	self caption = aString
+		ifTrue: [ ^ self ].
+
+	caption := aString.
+	self updateEditTimeAndEmail.
+	self announceContentChangedBy: aSource
+]
+
 { #category : #'api - accessing' }
 LePictureSnippet >> contentAsString [
 	^ urlString
+]
+
+{ #category : #'private - updating' }
+LePictureSnippet >> createReference [
+	self database ifNil: [ ^ self ].
+	self database isDatabase ifFalse: [ ^ self ].
+	self assert: self hasReference not.
+
+	self reference: self database pictureReferenceNextId
+]
+
+{ #category : #'api - testing' }
+LePictureSnippet >> hasCaption [
+	^ self caption isNotNil and: [ self caption trimBoth isNotEmpty ]
+]
+
+{ #category : #accessing }
+LePictureSnippet >> hasContent [
+	^ self urlString isNotEmpty or: [ self caption isNotEmpty ]
+]
+
+{ #category : #testing }
+LePictureSnippet >> hasReference [
+	^ self reference isNotNil and: [ self reference isNotEmpty ]
 ]
 
 { #category : #initialization }
 LePictureSnippet >> initialize [
 	super initialize.
 
-	urlString := ''
+	urlString := ''.
+	caption := ''.
+	previewHeight := 0.
+	reference := ''
 ]
 
-{ #category : #'api - testing' }
-LePictureSnippet >> isEmpty [
-	^ super isEmpty and: [ urlString isEmpty ]
+{ #category : #testing }
+LePictureSnippet >> isPictureSnippet [
+	^ true
+]
+
+{ #category : #testing }
+LePictureSnippet >> isPictureSnippetWithReference: aReference [
+	"Return true if aReference is same as #reference.
+	aReference is a String instance."
+
+	^ self hasReference and: [ self reference = aReference ]
 ]
 
 { #category : #'private - exporting' }
@@ -100,6 +185,81 @@ LePictureSnippet >> markdownOn: stream level: anInteger [
 { #category : #accessing }
 LePictureSnippet >> pictureFileBytes [
 	^ self urlString asFileReference binaryReadStream upToEnd.
+]
+
+{ #category : #accessing }
+LePictureSnippet >> previewHeight [ 
+	<return: #Number>
+
+	^ previewHeight ifNil: [ 0 ]
+]
+
+{ #category : #accessing }
+LePictureSnippet >> previewHeight: aString [
+
+	^ self previewHeight: aString source: self
+]
+
+{ #category : #accessing }
+LePictureSnippet >> previewHeight: aNumber source: aSource [
+	"Change the picture preview height."
+	self
+		assert: [ aNumber notNil ]
+		description: [ 'Preview height must be non-nil' ].
+	self
+		assert: [ aNumber >= 0 ]
+		description: [ 'Preview height must be equal or greater than 0' ].
+	
+	(self previewHeight closeTo: aNumber precision: 0.1)
+		ifTrue: [ ^ self ].
+
+	previewHeight := aNumber.
+	self updateEditTimeAndEmail.
+	self announceContentChangedBy: aSource
+]
+
+{ #category : #accessing }
+LePictureSnippet >> reference [ 
+	<return: #String>
+
+	^ reference
+]
+
+{ #category : #accessing }
+LePictureSnippet >> reference: aString [
+	self reference: aString source: self
+]
+
+{ #category : #accessing }
+LePictureSnippet >> reference: aString source: aSource [
+	"Change the picture reference.
+	The reference is a name that can be used to reference pictures in other parts, e.g., a text.
+	For example: {{gtFigure:ref=figure1}}"
+	self
+		assert: [ aString notNil ]
+		description: [ 'Reference must be non-nil' ].
+
+	self reference = aString
+		ifTrue: [ ^ self ].
+
+	reference := aString.
+	self updateEditTimeAndEmail.
+	self announceContentChangedBy: aSource
+]
+
+{ #category : #printing }
+LePictureSnippet >> storeOn: aStream [
+
+	aStream
+		nextPut: $(;
+		nextPutAll: self className;
+		nextPutAll: ' new urlString: '.
+	self urlString storeOn: aStream.
+	aStream nextPutAll: '; caption: '.
+	self caption storeOn: aStream.
+	aStream nextPutAll: '; previewHeight: '.
+	self previewHeight storeOn: aStream.
+	aStream nextPutAll: ')'
 ]
 
 { #category : #accessing }
@@ -129,4 +289,14 @@ LePictureSnippet >> urlString: aString source: anObject [
 	urlString := aString.
 	self updateEditTimeAndEmail.
 	self announceContentChangedBy: anObject
+]
+
+{ #category : #'api - utility' }
+LePictureSnippet >> urlStringUtility [
+	<return: #GtUrlStringUtility>
+	^ LeUrlStringUtilityBuilder new
+		database: self database;
+		urlString: self urlString;
+		build;
+		urlStringUtility
 ]

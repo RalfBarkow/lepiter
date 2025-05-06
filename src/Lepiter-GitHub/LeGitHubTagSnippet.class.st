@@ -9,10 +9,15 @@ Class {
 
 { #category : #'api - accessing menu' }
 LeGitHubTagSnippet class >> contextMenuItemSpecification [
-	<leSnippetSpecification>
+	"<leSnippetSpecification>"
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'GitHub tag'
+		title: self description
+]
+
+{ #category : #'api - accessing menu' }
+LeGitHubTagSnippet class >> description [
+	^ 'GitHub tag'
 ]
 
 { #category : #jsonV3 }

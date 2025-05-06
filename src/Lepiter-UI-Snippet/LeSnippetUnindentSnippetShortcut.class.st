@@ -16,5 +16,5 @@ LeSnippetUnindentSnippetShortcut >> name [
 
 { #category : #evaluation }
 LeSnippetUnindentSnippetShortcut >> performOnEditor: aBrTextEditor snippet: aLeSnippetElement dueTo: aShortcutEvent [
-	aLeSnippetElement snippetViewModel unindent
+	aLeSnippetElement snippetViewModel requestUnindent
 ]

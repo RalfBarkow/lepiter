@@ -53,14 +53,16 @@ LeAttachedLink >> description [
 			nextPutAll: ')' ]
 ]
 
-{ #category : #'gt - extensions' }
-LeAttachedLink >> gtSerializationFor: aView [
-	<gtView>
-	^ aView textEditor
-		title: 'Serialization';
-		priority: 80;
-		text: [String streamContents: [ :s | 
-				LeJsonV4 uniqueInstance serialize: self on: s prettyPrint: true ]]
+{ #category : #accessing }
+LeAttachedLink >> editEmail [
+	"Attached links cannot be currently edited."
+	^ self createEmail
+]
+
+{ #category : #accessing }
+LeAttachedLink >> editTime [
+	"Attached links cannot be currently edited."
+	^ self createTime
 ]
 
 { #category : #testing }

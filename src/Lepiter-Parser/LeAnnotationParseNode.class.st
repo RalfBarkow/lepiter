@@ -1,7 +1,7 @@
 Class {
 	#name : #LeAnnotationParseNode,
 	#superclass : #SmaCCParseNode,
-	#category : #'Lepiter-Parser'
+	#category : 'Lepiter-Parser'
 }
 
 { #category : #generated }

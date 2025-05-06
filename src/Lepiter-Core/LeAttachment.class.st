@@ -4,7 +4,8 @@ Class {
 	#instVars : [
 		'originalReference',
 		'uploadedBy',
-		'uploadDate'
+		'uploadDate',
+		'originalBasename'
 	],
 	#category : #'Lepiter-Core-Model'
 }
@@ -23,23 +24,52 @@ LeAttachment class >> forAttachedFile: aFileReference [
 	^ self loadFrom: aFileReference parent / self basename
 ]
 
-{ #category : #'instance creation' }
-LeAttachment class >> loadFrom: aFileReference [
-	"Load the receiver from the supplied file"
-
-	^ LeLocalStore currentStorageClass new loadFromFile: aFileReference
-]
-
-{ #category : #'instance creation' }
-LeAttachment class >> loadFromFolder: aFolderReference [
-	^ LeLocalStore currentStorageClass new 
-		loadFromFile: aFolderReference /  self basename
-]
-
 { #category : #visiting }
 LeAttachment >> acceptVisitor: aVisitor [
 
 	^ aVisitor visitAttachment: self
+]
+
+{ #category : #printing }
+LeAttachment >> fileNameDescription [
+	^ self originalReference 
+		ifNil: [ 
+			self originalBasename
+				ifNil: [ '<none>' ] ]
+		ifNotNil: #basename 
+]
+
+{ #category : #printing }
+LeAttachment >> gtDisplayOn: aStream [
+	super gtDisplayOn: aStream.
+	
+	aStream parenthesize: [
+		aStream << self fileNameDescription ]
+]
+
+{ #category : #accessing }
+LeAttachment >> originalBasename [
+	"This is a new field that can be missing for older attachments.
+	The reason we added it is to keep the name of the file even if 
+	the originalReference is missing, so that we can identify the 
+	actual attachment file, without needing callers to pass the file name"
+	
+	^ originalBasename
+]
+
+{ #category : #accessing }
+LeAttachment >> originalBasename: aFilename [
+	originalBasename := aFilename
+]
+
+{ #category : #accessing }
+LeAttachment >> originalExtension [
+	| basename |
+	basename := self originalBasename ifNil: [
+		self originalReference ifNotNil: [ :aFile | aFile basename ] ].
+	
+	^ basename ifNotNil: [ :aBasename |
+		aBasename copyAfterLast: Path extensionDelimiter ]
 ]
 
 { #category : #accessing }
@@ -52,22 +82,29 @@ LeAttachment >> originalReference: anObject [
 	originalReference := anObject
 ]
 
-{ #category : #saving }
-LeAttachment >> saveTo: aFileReference for: aLeDatabase [
-	"Save the receiver in the supplied directory in JSON format.
-	Only include personal information if explicitly flagged in the database"
-	| saveVersion propertiesFile |
+{ #category : #printing }
+LeAttachment >> storeOn: aStream [
 
-	saveVersion := aLeDatabase monitor savePersonalInformation 
-		ifTrue: [ self ]
-		ifFalse: [ self copy originalReference: nil ].
-	propertiesFile := aFileReference / self class basename.
-	propertiesFile ensureDelete.
-	propertiesFile writeStreamDo: [ :stream |
-		LeLocalStore currentStorageClass new 
-			serialize: saveVersion
-			on: (ZnNewLineWriterStream on: stream) 
-			prettyPrint: false ].
+	aStream
+		nextPut: $(;
+		<< self class name;
+		<< ' new';
+		<< ' instVarNamed: ''options'' put: ';
+			<< (self instVarNamed: 'options') storeString;
+			<< ';';
+		<< ' instVarNamed: ''originalBasename'' put: ';
+			<< (self instVarNamed: 'originalBasename') storeString;
+			<< ';';
+		<< ' instVarNamed: ''originalReference'' put: ';
+			<< (self instVarNamed: 'originalReference') storeString;
+			<< ';';
+		<< ' instVarNamed: ''uploadDate'' put: ';
+			<< (self instVarNamed: 'uploadDate') storeString;
+			<< ';';
+		<< ' instVarNamed: ''uploadedBy'' put: ';
+			<< (self instVarNamed: 'uploadedBy') storeString;
+			<< ';';
+		<< ' yourself)'
 
 ]
 

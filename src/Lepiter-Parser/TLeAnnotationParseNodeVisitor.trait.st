@@ -46,6 +46,11 @@ TLeAnnotationParseNodeVisitor >> visitCodeExpandedArgument: aCodeExpandedArgumen
 ]
 
 { #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitDateArgument: aDateArgument [
+	^ self visitArgument: aDateArgument
+]
+
+{ #category : #generated }
 TLeAnnotationParseNodeVisitor >> visitDbArgument: aDbArgument [
 	^ self visitArgument: aDbArgument
 ]
@@ -76,6 +81,11 @@ TLeAnnotationParseNodeVisitor >> visitHeightArgument: aHeightArgument [
 ]
 
 { #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitIdArgument: anIdArgument [
+	^ self visitArgument: anIdArgument
+]
+
+{ #category : #generated }
 TLeAnnotationParseNodeVisitor >> visitLabelArgument: aLabelArgument [
 	^ self visitArgument: aLabelArgument
 ]
@@ -101,13 +111,28 @@ TLeAnnotationParseNodeVisitor >> visitNoCodeArgument: aNoCodeArgument [
 ]
 
 { #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitPackageAnnotation: aPackageAnnotation [
+	^ self visitAnnotation: aPackageAnnotation
+]
+
+{ #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitPackageNameArgument: aPackageNameArgument [
+	^ self visitNameArgument: aPackageNameArgument
+]
+
+{ #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitPackageTagArgument: aPackageTagArgument [
+	^ self visitArgument: aPackageTagArgument
+]
+
+{ #category : #generated }
 TLeAnnotationParseNodeVisitor >> visitPageAnnotation: aPageAnnotation [
 	^ self visitAnnotation: aPageAnnotation
 ]
 
 { #category : #generated }
-TLeAnnotationParseNodeVisitor >> visitPageArgument: aPageArgument [
-	^ self visitArgument: aPageArgument
+TLeAnnotationParseNodeVisitor >> visitPageNameArgument: aPageNameArgument [
+	^ self visitNameArgument: aPageNameArgument
 ]
 
 { #category : #generated }
@@ -118,6 +143,11 @@ TLeAnnotationParseNodeVisitor >> visitPreviewExpandedArgument: aPreviewExpandedA
 { #category : #generated }
 TLeAnnotationParseNodeVisitor >> visitPreviewHeightArgument: aPreviewHeightArgument [
 	^ self visitArgument: aPreviewHeightArgument
+]
+
+{ #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitPreviewSelectArgument: aPreviewSelectArgument [
+	^ self visitArgument: aPreviewSelectArgument
 ]
 
 { #category : #generated }
@@ -133,4 +163,9 @@ TLeAnnotationParseNodeVisitor >> visitReturnArgument: aReturnArgument [
 { #category : #generated }
 TLeAnnotationParseNodeVisitor >> visitShowArgument: aShowArgument [
 	^ self visitArgument: aShowArgument
+]
+
+{ #category : #generated }
+TLeAnnotationParseNodeVisitor >> visitTodoAnnotation: aTodoAnnotation [
+	^ self visitAnnotation: aTodoAnnotation
 ]

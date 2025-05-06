@@ -74,12 +74,33 @@ LeArgumentNode >> isCodeExpanded [
 ]
 
 { #category : #testing }
+LeArgumentNode >> isDate [
+	^ false
+]
+
+{ #category : #testing }
+LeArgumentNode >> isDb [
+	^ false
+]
+
+{ #category : #testing }
+LeArgumentNode >> isDefined [
+
+	^ name isNotNil and: [ value isNotNil ]
+]
+
+{ #category : #testing }
 LeArgumentNode >> isExpanded [
 	^ false
 ]
 
 { #category : #testing }
 LeArgumentNode >> isHeight [
+	^ false
+]
+
+{ #category : #testing }
+LeArgumentNode >> isId [
 	^ false
 ]
 
@@ -114,12 +135,22 @@ LeArgumentNode >> isPreviewHeight [
 ]
 
 { #category : #testing }
+LeArgumentNode >> isPreviewSelect [
+	^ false
+]
+
+{ #category : #testing }
 LeArgumentNode >> isPreviewShow [
 	^ false
 ]
 
 { #category : #testing }
 LeArgumentNode >> isShow [
+	^ false
+]
+
+{ #category : #testing }
+LeArgumentNode >> isTag [
 	^ false
 ]
 

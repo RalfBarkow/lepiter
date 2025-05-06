@@ -4,7 +4,7 @@ Class {
 	#instVars : [
 		'classToken'
 	],
-	#category : #'Lepiter-Parser'
+	#category : 'Lepiter-Parser'
 }
 
 { #category : #generated }
@@ -22,6 +22,11 @@ LeClassNameArgumentNode >> behavior [
 				ifFalse: [ cls class ] ]
 ]
 
+{ #category : #accessing }
+LeClassNameArgumentNode >> className [ 
+	^ self value value
+]
+
 { #category : #generated }
 LeClassNameArgumentNode >> classToken [
 	^ classToken
@@ -30,6 +35,12 @@ LeClassNameArgumentNode >> classToken [
 { #category : #generated }
 LeClassNameArgumentNode >> classToken: aSmaCCToken [
 	classToken := aSmaCCToken
+]
+
+{ #category : #testing }
+LeClassNameArgumentNode >> doesReferenceExist [
+	"Return true if a referenced object is defined"
+	^ self imageObject notNil
 ]
 
 { #category : #accessing }

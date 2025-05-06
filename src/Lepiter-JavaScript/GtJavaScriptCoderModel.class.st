@@ -33,7 +33,7 @@ Class {
 }
 
 { #category : #converting }
-GtJavaScriptCoderModel >> asCoderUIModel [
+GtJavaScriptCoderModel >> asCoderViewModel [
 
 	^ GtSourceCoderViewModel new coder: self
 ]
@@ -52,7 +52,7 @@ GtJavaScriptCoderModel >> bindAndExecute: sourceString [
 	1. globals declared in the code
 	2. undeclared names that are in pharoBindings"
 	varNames := visitor declaredVarNames, 
-		(visitor allUndeclaredNames asSet intersection: pharoBindings allNames asSet).
+		(visitor allUndeclaredNames asSet intersection: pharoBindings bindingNames asSet).
 
 	"Assign the final statement to snippetResult"
 	lastStatement := ast items last.
@@ -81,16 +81,42 @@ GtJavaScriptCoderModel >> bindAndExecute: sourceString [
 
 { #category : #'api - ast' }
 GtJavaScriptCoderModel >> computeAst: theSourceString [
-	^ JSParser
-		parseWithErrors: theSourceString
-		startingAt: JSParser startingStateForExpression
+	^ JSParser parseWithErrors: theSourceString
+]
+
+{ #category : #'api - ast' }
+GtJavaScriptCoderModel >> implicitVariableReferencesTo: aString do: aBlock [
+	self astSync allNodesOfType: JSNameExpressionNode do: [ :node | 
+		node name source = aString ifTrue: [ 
+			(node parent isKindOf: JSVariableDeclarationNode)
+				ifTrue: [ ^ self ]
+				ifFalse: [ aBlock value: node ] ] ]
 ]
 
 { #category : #initialize }
 GtJavaScriptCoderModel >> initializeAddOns: addOns [
 	super initializeAddOns: addOns.
 	
-	addOns addStyler: (GtCoderAstSmaCCParserStyler new smaccStyler: JSParser gtStyler)
+	addOns addStyler: (GtCoderAstSmaCCParserStyler new smaccStyler: JSParser gtStyler).
+	
+	addOns
+		addMainAction: 'Evaluate' translated
+		icon: BrGlamorousVectorIcons play
+		action: [ :aCoderUIModel :anElement | 
+			GtCoderCodeExecutor doIt
+				coderViewModel: aCoderUIModel;
+				element: anElement;
+				execute ]
+		id: GtSourceCoderDoItActionId.
+	addOns
+		addMainAction: 'Inspect' translated
+		icon: BrGlamorousVectorIcons playinspect
+		action: [ :aCoderUIModel :anElement | 
+			GtCoderCodeExecutor doItAndGo
+				coderViewModel: aCoderUIModel;
+				element: anElement;
+				execute ]
+		id: GtSourceCoderDoItAndGoActionId.
 ]
 
 { #category : #initialize }
@@ -152,7 +178,7 @@ GtJavaScriptCoderModel >> primitiveEvaluate: aSourceString inContext: aGtSourceC
 	result := self bindAndExecute: aSourceString.
 	
 	result removeKey: '__jsLinkImmediate'.
-	result associationsDo: [ :binding | pharoBindings at: binding key asSymbol put: binding value ].
+	result associationsDo: [ :binding | (pharoBindings bindingOf: binding key asSymbol) value: binding value ].
 
 	^ result
 		at: 'snippetResult'

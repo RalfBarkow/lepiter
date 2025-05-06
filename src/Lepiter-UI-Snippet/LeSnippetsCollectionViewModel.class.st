@@ -3,9 +3,9 @@ Class {
 	#superclass : #LeContentCollectionViewModel,
 	#instVars : [
 		'snippetsMap',
-		'snippetBindings',
 		'focusedSnippetUIModel',
-		'viewModelToScrollTo'
+		'viewModelToScrollTo',
+		'sharedSnippetContext'
 	],
 	#category : #'Lepiter-UI-Snippet-! View Models'
 }
@@ -24,17 +24,23 @@ LeSnippetsCollectionViewModel >> content: aLeContent [
 ]
 
 { #category : #'private - instance creation' }
-LeSnippetsCollectionViewModel >> createSnippetUIModelFor: aLeSnippet [
+LeSnippetsCollectionViewModel >> createSnippetViewModelFor: aLeSnippet [
 	^ aLeSnippet asSnippetViewModel
 		snippetsCollection: self;
-		snippetBindings: self snippetBindings
+		sharedSnippetContext: self sharedSnippetContext
 ]
 
 { #category : #'api - snippets' }
 LeSnippetsCollectionViewModel >> findOrCreateSnippetViewModel: aLeSnippet [
 	^ snippetsMap
 		at: aLeSnippet
-		ifAbsentPut: [ self createSnippetUIModelFor: aLeSnippet ]
+		ifAbsentPut: [ self createSnippetViewModelFor: aLeSnippet ]
+]
+
+{ #category : #'api - snippets' }
+LeSnippetsCollectionViewModel >> findSnippetViewModel: aLeSnippet [
+	^ snippetsMap
+		at: aLeSnippet
 ]
 
 { #category : #'api - focus' }
@@ -57,6 +63,17 @@ LeSnippetsCollectionViewModel >> focusSnippetUIModel: aSnippetUIModel [
 	focusedSnippetUIModel focused: true
 ]
 
+{ #category : #'gt - extensions' }
+LeSnippetsCollectionViewModel >> gtViewSnippetsMapFor: aView [
+	<gtView>
+	
+	^ aView forward 
+		title: 'Snippets map';
+		priority: 10;
+		object: [ snippetsMap ];
+		view: #gtItemsFor:
+]
+
 { #category : #private }
 LeSnippetsCollectionViewModel >> includesContentUIModel: aContentUIModel [
 	self allChildrenBreadthFirstDo: [ :eachUIModel |
@@ -66,11 +83,17 @@ LeSnippetsCollectionViewModel >> includesContentUIModel: aContentUIModel [
 	^ false
 ]
 
+{ #category : #'api - testing' }
+LeSnippetsCollectionViewModel >> includesSnippetViewModelForSnippet: aLeSnippet [
+	^ snippetsMap
+		includesKey: aLeSnippet
+]
+
 { #category : #initialization }
 LeSnippetsCollectionViewModel >> initialize [
 	super initialize.
 
-	snippetBindings := GtSnippetBindings new.
+	sharedSnippetContext := LeSharedSnippetContext new.
 	snippetsMap := IdentityDictionary new
 ]
 
@@ -90,28 +113,28 @@ LeSnippetsCollectionViewModel >> scrollToViewModel: aLeViewModel [
 ]
 
 { #category : #accessing }
-LeSnippetsCollectionViewModel >> snippetBindings [
-	^ snippetBindings
+LeSnippetsCollectionViewModel >> sharedSnippetContext [
+	^ sharedSnippetContext
 ]
 
 { #category : #accessing }
-LeSnippetsCollectionViewModel >> snippetBindings: aGtSnippetBindings [
+LeSnippetsCollectionViewModel >> sharedSnippetContext: aLeSharedSnippetContext [
 	self
-		assert: [ aGtSnippetBindings notNil ]
-		description: [ 'Snippet bindings must not be nil' ].
+		assert: [ aLeSharedSnippetContext notNil ]
+		description: [ 'Shared snippet context must not be nil' ].
 
-	snippetBindings := aGtSnippetBindings.
+	sharedSnippetContext := aLeSharedSnippetContext.
 	
-	self allChildrenBreadthFirstDo: [ :eachSnippetUIModel | eachSnippetUIModel snippetBindings: aGtSnippetBindings ]
+	self allChildrenBreadthFirstDo: [ :eachSnippetUIModel | eachSnippetUIModel sharedSnippetContext: aLeSharedSnippetContext ]
 ]
 
 { #category : #'api - scrolling' }
-LeSnippetsCollectionViewModel >> takeViewModelToScrollTo [
-	| aViewModelToScrollTo |
+LeSnippetsCollectionViewModel >> takeViewModelToScrollToIf: aBlock [
+	"Evaluate a given block with a pending view model to scroll to
+	and if aBlock returns true, forget that view model and consider scrolling request to be fulfilled"
 
-	aViewModelToScrollTo := viewModelToScrollTo.
-	viewModelToScrollTo := nil.
-	^ aViewModelToScrollTo
+	(aBlock value: viewModelToScrollTo)
+		ifTrue: [ viewModelToScrollTo := nil ]
 ]
 
 { #category : #'api - focus' }

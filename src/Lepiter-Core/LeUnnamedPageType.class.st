@@ -10,7 +10,7 @@ Class {
 	#instVars : [
 		'defaultTitle'
 	],
-	#category : #'Lepiter-Core-Model'
+	#category : 'Lepiter-Core-Model'
 }
 
 { #category : #'instance creation' }
@@ -77,6 +77,7 @@ LeUnnamedPageType >> printOn: aStream [
 LeUnnamedPageType >> shortDescription [
 	| string |
 
+	defaultTitle ifNotNil: [ ^ defaultTitle ].
 	page hasChildren ifFalse: [ ^ '' ].
 	
 	string := page children first contentAsString.

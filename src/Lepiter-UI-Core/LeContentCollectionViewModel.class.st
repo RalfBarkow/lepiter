@@ -13,9 +13,14 @@ Class {
 }
 
 { #category : #enumerating }
-LeContentCollectionViewModel >> allChildrenBreadthFirstDo: aBlock [ 
-	self children do: aBlock.
-	self children do: [ :each | each allChildrenBreadthFirstDo: aBlock ]
+LeContentCollectionViewModel >> allChildrenBreadthFirstDo: aBlock [
+	| queue |
+	queue := LinkedList withAll: self children.
+	[ queue notEmpty ]
+		whileTrue: [ | child |
+			child := queue removeFirst.
+			aBlock value: child.
+			queue addAll: child children ]
 ]
 
 { #category : #announcer }
@@ -52,6 +57,16 @@ LeContentCollectionViewModel >> content: aLeContent [
 	content := aLeContent
 ]
 
+{ #category : #'gt - extensions' }
+LeContentCollectionViewModel >> gtViewChildrenFor: aView [ 
+	<gtView>
+	
+	^ aView list
+		title: 'Children';
+		priority: 25;
+		items: [ self children ]
+]
+
 { #category : #initialization }
 LeContentCollectionViewModel >> initialize [
 	super initialize.
@@ -77,8 +92,9 @@ LeContentCollectionViewModel >> postCopy [
 ]
 
 { #category : #'api - scrolling' }
-LeContentCollectionViewModel >> takeViewModelToScrollTo [
-	^ nil
+LeContentCollectionViewModel >> takeViewModelToScrollToIf: aBlock [
+	"Evaluate a given block with a pending view model to scroll to
+	and if aBlock returns true, forget that view model and consider scrolling request to be fulfilled"
 ]
 
 { #category : #private }

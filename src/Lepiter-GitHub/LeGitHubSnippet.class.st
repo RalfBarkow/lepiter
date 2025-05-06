@@ -13,6 +13,11 @@ LeGitHubSnippet class >> empty [
 	^ self new
 ]
 
+{ #category : #testing }
+LeGitHubSnippet class >> isAbstract [
+	^ self name = #LeGitHubSnippet
+]
+
 { #category : #jsonV3 }
 LeGitHubSnippet class >> leJsonV3AttributeMapping [
 
@@ -60,11 +65,6 @@ LeGitHubSnippet >> initialize [
 	
 ]
 
-{ #category : #'api - testing' }
-LeGitHubSnippet >> isEmpty [
-	^ self model isNil
-]
-
 { #category : #'api - accessing' }
 LeGitHubSnippet >> model [
 	<return: #LeGitHubModel>
@@ -90,24 +90,26 @@ LeGitHubSnippet >> onModelConfigurationChanged: anAnnouncement [
 
 { #category : #'private - announcement handling' }
 LeGitHubSnippet >> onModelResponseChanged: anAnnouncement [
+
 	| aDatabase |
 	self model hasSuccessResponse ifFalse: [ ^ self ].
-	
+
 	aDatabase := self database.
 	aDatabase isDatabase ifFalse: [ ^ self ].
 	aDatabase monitor ifNil: [ ^ self ].
-	
+
 	self responseCacheName
 		ifNil: [ 
 			| aFileName |
-			aFileName := aDatabase 
-				addAttachmentWithContent: self responseCacheContent
-				named: 'github-response-cache.json'.
+			aFileName := aDatabase
+				             addAttachmentWithContent: self responseCacheContent
+				             named: 'github-response-cache.json'.
 			self responseCacheName: aFileName source: anAnnouncement source ]
 		ifNotNil: [ 
-			aDatabase 
-				updateAttachmentNamed: self responseCacheName 
-				content: self responseCacheContent ].
+			aDatabase readOnly ifFalse: [ 
+				aDatabase
+					updateAttachmentNamed: self responseCacheName
+					content: self responseCacheContent ] ]
 ]
 
 { #category : #'api - model' }
@@ -118,6 +120,11 @@ LeGitHubSnippet >> ownerName [
 { #category : #'api - model' }
 LeGitHubSnippet >> ownerName: aString [
 	self model ownerName: aString
+]
+
+{ #category : #'as yet unclassified' }
+LeGitHubSnippet >> paragraphStyle [
+	^ LeParagraphStyle text
 ]
 
 { #category : #'api - model' }

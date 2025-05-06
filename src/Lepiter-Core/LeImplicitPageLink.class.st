@@ -1,3 +1,8 @@
+"
+An implicit link is one where the title of a page is contained in the text of a snippet, but it isn't explicitly marked as a link.
+
+Implicit links have also been called ""unreferenced links"".
+"
 Class {
 	#name : #LeImplicitPageLink,
 	#superclass : #LeLink,
@@ -14,6 +19,14 @@ Class {
 LeImplicitPageLink >> database [ 
 
 	^ origin database
+]
+
+{ #category : #'api - accessing' }
+LeImplicitPageLink >> editTime [ 
+	"Answer the edit time of the receiver's origin"
+	<return: #LeTime>
+
+	^ origin editTime
 ]
 
 { #category : #accessing }

@@ -10,13 +10,13 @@ LeHasIncomingLinksFilter class >> filterDescriptorFor: aLeDatabase do: aBlock [
 		value:
 			(GtFilterDescriptor
 				creator: [ :value | self new ]
-				named: 'Has Incoming Links'
+				named: 'Has incoming links'
 				order: 13) valueNotRequired.
 	aBlock
 		value:
 			(GtFilterDescriptor
 				creator: [ :value | self new not ]
-				named: 'No Incoming Links'
+				named: 'No incoming links'
 				order: 13) valueNotRequired
 ]
 

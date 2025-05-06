@@ -4,7 +4,18 @@ Class {
 	#category : #'Lepiter-Snippet-Words-Examples'
 }
 
-{ #category : #'examples - snippets' }
+{ #category : #asserting }
+LeWordSnippetUpdateExamples >> assertModificationAnnouncements: anAnnouncementsCollection [
+	self 
+		assertOneModificationAnnouncementIn: anAnnouncementsCollection 
+		ofType: LeWordSnippetWordChangedAnnouncement 
+		do: [ :anAnnouncement |
+			self 
+				assert: anAnnouncement snippet word 
+				equals: 'hello2' ]
+]
+
+{ #category : #asserting }
 LeWordSnippetUpdateExamples >> assertSnippetModifiedFor: aSnippet [ 
 	self assert: aSnippet word equals: 'hello2'
 ]
@@ -12,6 +23,7 @@ LeWordSnippetUpdateExamples >> assertSnippetModifiedFor: aSnippet [
 { #category : #'examples - snippets' }
 LeWordSnippetUpdateExamples >> createTargetSnippet [
 	<gtExample>
+	<return: #LeWordSnippet>
 	^ LeWordExamples new snippetWithExplanation
 ]
 

@@ -34,7 +34,9 @@ LeGitHubSnippetElement >> modelElement [
 { #category : #'api - snippet view model' }
 LeGitHubSnippetElement >> onSnippetViewModelChanged [
 	super onSnippetViewModelChanged.
-	self modelElement model: self snippet model.
+	self modelElement
+		model: self snippet model;
+		snippetViewModel: self snippetViewModel
 ]
 
 { #category : #'api - view' }

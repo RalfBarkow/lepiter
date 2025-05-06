@@ -5,43 +5,10 @@ Class {
 	#classTraits : 'TBrLayoutResizable classTrait + TLeWithLinkReferenceViewModel classTrait + TLeWithFontSize classTrait + TLePageToolContentTreeElement classTrait + TBlAssertUIProcess classTrait',
 	#instVars : [
 		'treeElement',
-		'snippetsViewModel',
-		'updateRequester'
+		'snippetsViewModel'
 	],
 	#category : #'Lepiter-UI-! Link Reference'
 }
-
-{ #category : #'private - tree element' }
-LeLinkReferenceElement >> createTreeElement [
-	^ BrSimpleTree new
-		matchParent;
-		padding: (BlInsets top: 10 left: 0 bottom: 5 right: 20);
-		aptitudeDo: [ :aLook | aLook treeElement clipChildren: false ];
-		nodeType: [ :anItemTypeFactory :aTreeNode :aNodeIndex | aTreeNode value snippetView ];
-		nodeId: [ :aTreeNode :aNodeIndex | aTreeNode value uid ];
-		nodeStencil: [ :aSnippetView | aSnippetView asElement ];
-		nodeDataBinder: [ :aSnippetElement :aTreeNode |
-			aSnippetElement snippetViewModel: aTreeNode value ];
-		rowStencil: [ :aNodeType :aNodeElement | self createTreeRowFor: aNodeElement ];
-		rowDataBinder: [ :aRowElement :aTreeNode :aRowIndex | self bindTreeRowData: aTreeNode to: aRowElement at: aRowIndex ]
-]
-
-{ #category : #'private - tree element' }
-LeLinkReferenceElement >> createTreeRowFor: aSnippetElement [
-	^ BlElement new
-		layout: BlLinearLayout horizontal;
-		clipChildren: false;
-		constraintsDo: [ :c |
-			c horizontal matchParent.
-			c vertical fitContent ];
-		addChild: (BrTriangle new
-			beSmallSize;
-			aptitude: BrGlamorousTriangleInCircleAptitude;
-			toggleAction: [ :aToggleElement :aToggleModel |
-				aToggleModel model toggle.
-				aSnippetElement snippetViewModel expanded: aToggleModel model isExpanded ]) as: #toggle;
-		addChild: aSnippetElement
-]
 
 { #category : #initialization }
 LeLinkReferenceElement >> defaultLayout [
@@ -52,14 +19,14 @@ LeLinkReferenceElement >> defaultLayout [
 LeLinkReferenceElement >> initialize [
 	super initialize.
 	self initializeFontSizeShortcuts.
-	self initializeUpdaterRequester.
+	self initializeElementUpdater.
 
 	treeElement := self createTreeElement.
 	self addChild: treeElement as: #snippetsTree.
 	"it will be initialized when #page is assigned"
 	snippetsViewModel := nil.
 
-	self addAptitude: (BrLayoutResizerAptitude inherit
+	self addAptitude: (BrLayoutResizerAptitude new
 		inherit: treeElement).
 
 	self matchParent.
@@ -68,15 +35,15 @@ LeLinkReferenceElement >> initialize [
 { #category : #'api - link reference view model' }
 LeLinkReferenceElement >> onLinkReferenceViewModelChanged [
 	"Is sent when a new linkReference view model is assigned to the element"
-	| linkReferenceSnippetViewModel pageSnippetsTreeViewModel pageIncomingLinksViewModel |
+	| linkReferenceSnippetViewModel pageSnippetsTreeViewModel |
 
-	self page ensureOneBlock.
+	self page ensureOneSnippet.
 	
 	linkReferenceSnippetViewModel := LeLinkReferenceCollectionViewModel new
 		linkReferencePreviewViewModel: self linkReferenceViewModel previewViewModel.
 
 	pageSnippetsTreeViewModel := LeSnippetsTreeViewModel new
-		snippetBindings: self pageViewModel snippetBindings.
+		sharedSnippetContext: self pageViewModel sharedSnippetContext.
 
 	"pageIncomingLinksViewModel := self class incomingLinksViewModelClass new."
 

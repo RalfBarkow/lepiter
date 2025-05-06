@@ -1,6 +1,6 @@
 "
 I build a dropdown that confirms a page removal.
-I am used in {{gtMethod:LePageHeaderBuilder>>#addRemovePageButton}}. 
+I am used by the page remove action in {{gtMethod:LePage>>#gtRemoveActionFor:}}. 
 ## Example
 {{gtExample:LeUIExamples>>#pageToolContentElement_TitleAndAllActionButtons|previewExpanded|codeExpanded=false}}
 
@@ -9,11 +9,11 @@ Class {
 	#name : #LePageRemoveDropdownContentStencil,
 	#superclass : #BrStencil,
 	#instVars : [
-		'pageElement',
 		'anchor',
 		'icon',
 		'label',
-		'action'
+		'action',
+		'page'
 	],
 	#category : #'Lepiter-UI-Support - Page Toolbar'
 }
@@ -85,6 +85,7 @@ LePageRemoveDropdownContentStencil >> label: anObject [
 { #category : #'private - instance creation' }
 LePageRemoveDropdownContentStencil >> newConfirmationButton [
 	^ BrButton new
+		id: LePageConfirmationActionId;
 		icon: self icon;
 		beSmallSize;
 		requestFocus;
@@ -142,24 +143,17 @@ LePageRemoveDropdownContentStencil >> newNotLinkedPageDescriptionElement [
 
 { #category : #'private - accessing' }
 LePageRemoveDropdownContentStencil >> page [
-	^ self pageElement 
-		ifNotNil: [ :anElement | anElement pageViewModel pageModel ] 
-		ifNil: [ LePage null ]
+	^ page
 ]
 
-{ #category : #accessing }
-LePageRemoveDropdownContentStencil >> pageElement [
-	^ pageElement
-]
-
-{ #category : #accessing }
-LePageRemoveDropdownContentStencil >> pageElement: anObject [
-	pageElement := anObject
+{ #category : #'private - building' }
+LePageRemoveDropdownContentStencil >> page: aPage [
+	page := aPage
 ]
 
 { #category : #'private - actions' }
 LePageRemoveDropdownContentStencil >> removePage [
-	self pageElement ifNotNil: [ :anElement | anElement pageViewModel removePage ]
+	page removeSelf
 ]
 
 { #category : #'private - actions' }

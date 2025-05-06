@@ -1,39 +1,35 @@
 Class {
 	#name : #LeSnippetStylerVisitor,
 	#superclass : #LeContentNodeVisitor,
-	#traits : 'TSmaCCCompositeVisitor + (TLeContentNodeVisitor - {#acceptNode:})',
-	#classTraits : 'TSmaCCCompositeVisitor classTrait + TLeContentNodeVisitor classTrait',
+	#traits : 'TLeExtensibleContentNodeVisitor + TSmaCCCompositeVisitor + TLeContentNodeVisitor',
+	#classTraits : 'TLeExtensibleContentNodeVisitor classTrait + TSmaCCCompositeVisitor classTrait + TLeContentNodeVisitor classTrait',
 	#instVars : [
 		'styler',
 		'text',
 		'referencedPage',
 		'results'
 	],
-	#classVars : [
-		'AdditionalStylers'
-	],
 	#category : #'Lepiter-UI-Snippet-Text styler'
 }
 
 { #category : #accessing }
 LeSnippetStylerVisitor class >> addStyler: aVisitorClass [
-	self additionalStylers add: aVisitorClass
+	self addComponentVisitorClass: aVisitorClass
 ]
 
 { #category : #accessing }
 LeSnippetStylerVisitor class >> additionalStylers [
-	^ AdditionalStylers
-		ifNil: [ AdditionalStylers := self defaultStylers ]
+	^ self componentVisitorClasses
 ]
 
 { #category : #accessing }
-LeSnippetStylerVisitor class >> defaultStylers [
+LeSnippetStylerVisitor class >> defaultComponentVisitorClasses [
 	^ OrderedCollection with: LeAnnotationStylerVisitor
 ]
 
 { #category : #accessing }
 LeSnippetStylerVisitor class >> removeStyler: aVisitorClass [
-	self additionalStylers remove: aVisitorClass ifAbsent: [  ]
+	self removeComponentVisitorClass: aVisitorClass
 ]
 
 { #category : #widgets }
@@ -61,8 +57,9 @@ LeSnippetStylerVisitor class >> textLinkButtonPadding: additionalPadding margin:
 		addAptitude: (BrGlamorousButtonLabelAptitude new 
 			defaultColor: color;
 			hoveredColor: color muchDarker);
-		padding: (BlInsets top: 0 left: 0 bottom: 0 right: 0) + additionalPadding;
-		margin: (BlInsets top: -1 left: 0 bottom: 0 right: 0) + additionalMargin;
+		placeholderAlignment: #alignBottom;
+		padding: (BlInsets top: 0 left: 0 bottom: -1 right: 0) + additionalPadding;
+		margin: (BlInsets top: 0 left: 0 bottom: 0 right: 0) + additionalMargin;
 		icon: BrGlamorousVectorIcons inspect;
 		beNoneSize;
 		layout: BlLinearLayout horizontal;
@@ -79,11 +76,16 @@ LeSnippetStylerVisitor >> acceptNode: aSmaCCParseNode [
 		ifTrue: [ ^ nil ].	
 	
 	^ BlTextStylerTelemetry
-		timeSync: [ 'Visit ', aSmaCCParseNode class name ]
+		time: [ 'Visit ', aSmaCCParseNode class name ]
 		during: [	
 			(self lookupVisitorFor: aSmaCCParseNode)
 				ifNil: [ self visitSmaCCParseNode: aSmaCCParseNode ]
 				ifNotNil: [ :visitor | aSmaCCParseNode acceptVisitor: visitor ] ]
+]
+
+{ #category : #evaluating }
+LeSnippetStylerVisitor >> beginStyling [
+	visitors do: [ :each | each beginStyling ]
 ]
 
 { #category : #evaluating }
@@ -106,15 +108,16 @@ LeSnippetStylerVisitor >> elements [
 
 { #category : #evaluating }
 LeSnippetStylerVisitor >> evaluateCodeBlock: aCodeBlock expanded: aBoolean from: aButton [
-	| aCommand anErrorCatchingCommand position source |
-	aCommand := GtEvaluateSourceCodeCommand new.
-	aCommand requestor: aCodeBlock.
-	aCommand sourceCode: aCodeBlock code source.
-	aCommand variableBindings: self variableBindings.
-	aCommand receiver: self evaluationReceiver.
-	anErrorCatchingCommand := aCommand asErrorCatchingCommand.
-	anErrorCatchingCommand execute.
+	| aSnippetCoder aSnippetCoderViewModel aResult position source |
+	
 	source := aCodeBlock code source.
+	
+	aSnippetCoder := GtPharoSnippetCoder forSource: source.
+	aSnippetCoderViewModel := aSnippetCoder asCoderViewModel.
+	aSnippetCoderViewModel selfObject: self evaluationReceiver.
+	aSnippetCoderViewModel sharedBindings: self variableBindings.
+	aResult := aSnippetCoderViewModel doItAll.
+
 	position := source size.
 	[ position > 1 and: [ (source at: position) isLineBreak ] ]
 		whileTrue: [ position := position - 1 ].
@@ -122,10 +125,11 @@ LeSnippetStylerVisitor >> evaluateCodeBlock: aCodeBlock expanded: aBoolean from:
 		at: aCodeBlock code
 		put:
 			(LeEvaluationResult new
-				value: anErrorCatchingCommand result;
+				value: aResult;
 				expanded: aBoolean;
 				position: position).
-	self editor styleText
+	self styler snippetViewModel coderViewModel  coderModel  requestStyleSourceText.
+	aBoolean ifTrue: [ aButton phlow spawnObject: aResult value ].
 ]
 
 { #category : #evaluating }
@@ -177,6 +181,7 @@ LeSnippetStylerVisitor >> findFileUrlPath: pathString in: rootDir [
 
 { #category : #evaluating }
 LeSnippetStylerVisitor >> finished [
+	visitors do: [ :each | each finishStyling ].
 	self
 		executionResults:
 			(self executionResults
@@ -208,8 +213,6 @@ LeSnippetStylerVisitor >> fontSizeForHeadingLevel: aHeadingLevel [
 { #category : #initialization }
 LeSnippetStylerVisitor >> initialize [
 	super initialize.
-	self class additionalStylers
-		do: [ :each | self addVisitor: each new ].
 	results := IdentitySet new
 ]
 
@@ -261,14 +264,6 @@ LeSnippetStylerVisitor >> newExpandedElement: aLink [
 ]
 
 { #category : #'api - accessing' }
-LeSnippetStylerVisitor >> normalFontSize [
-	"Styler should specify font sizes in relative units"
-
-	self halt.
-	^ 20
-]
-
-{ #category : #'api - accessing' }
 LeSnippetStylerVisitor >> referencedPage [
 	^ referencedPage
 ]
@@ -304,56 +299,73 @@ LeSnippetStylerVisitor >> snippetViewModel [
 
 { #category : #'private - styling' }
 LeSnippetStylerVisitor >> styleAutoHiding: leftRange and: rightRange whenOutside: nodeInterval [
-	| anAttribute marker1 marker2 |
-	self showMarkup
-		ifTrue: [ ^ self ].
+	| anAttribute marker1 marker2 cursorAttribute |
+	self showMarkup ifTrue: [ ^ self ].
 	marker1 := BrTextInvisibleMarkerAttribute new.
 	marker2 := BrTextInvisibleMarkerAttribute new.
-	(self text from: leftRange first to: leftRange last)
-		attribute: marker1.
-	(self text from: rightRange first to: rightRange last)
-		attribute: marker2.
+	self text
+		attribute: marker1
+		from: leftRange first
+		to: leftRange last.
+	self text
+		attribute: marker2
+		from: rightRange first
+		to: rightRange last.
 	anAttribute := BrTextAdornmentDynamicAttribute new
-		beReplace;
-		stencil: [ :aTBrTextEditorTextualPiece :anEditorElement | #() ].
+			beReplace;
+			stencil: [ :aTBrTextEditorTextualPiece :anEditorElement | #() ].
 	(self isCursorInside: nodeInterval)
-		ifFalse: [ (self text from: leftRange first to: leftRange last)
-				attribute: anAttribute.
-			(self text from: rightRange first to: rightRange last)
-				attribute: anAttribute ].
-	(self text from: nodeInterval first to: nodeInterval last)
-		onCursorEnter: [ :aTextEditor | 
-			| left right |
-			aTextEditor text
-				findAttribute: marker1
-				indicesDo: [ :start :end | left := start ].
-			aTextEditor text
-				findAttribute: marker2
-				indicesDo: [ :start :end | right := end ].
-			(left notNil and: [ right notNil ])
-				ifTrue: [ | cursorIndex |
-					cursorIndex := aTextEditor cursors first position.
-					(cursorIndex between: left - 2 and: right)
-						ifTrue: [ (aTextEditor text from: left to: right)
-								clearAttributes: [ :eachAttribute | eachAttribute == anAttribute ] ] ] ]
-		leave: [ :aTextEditor | 
-			| left right |
-			aTextEditor text
-				findAttribute: marker1
-				indicesDo: [ :start :end | left := start to: end ].
-			aTextEditor text
-				findAttribute: marker2
-				indicesDo: [ :start :end | right := start to: end ].
-			(left notNil and: [ right notNil ])
-				ifTrue: [ (aTextEditor text from: left first to: left last)
-						attributes: {anAttribute}.
-					(aTextEditor text from: right first to: right last)
-						attributes: {anAttribute} ] ]
+		ifFalse: [ self text
+				attribute: anAttribute
+				from: leftRange first
+				to: leftRange last.
+			self text
+				attribute: anAttribute
+				from: rightRange first
+				to: rightRange last ].
+	cursorAttribute := BrTextCursorAttribute new
+			enterAction: [ :aTextEditor | 
+				| left right |
+				aTextEditor text
+					findAttribute: marker1
+					indicesDo: [ :start :end | left := start ].
+				aTextEditor text
+					findAttribute: marker2
+					indicesDo: [ :start :end | right := end ].
+				(left notNil and: [ right notNil ])
+					ifTrue: [ | cursorIndex |
+						cursorIndex := aTextEditor cursors first position.
+						(cursorIndex between: left - 2 and: right)
+							ifTrue: [ aTextEditor text
+									clearAttributes: left
+									to: right
+									if: [ :eachAttribute | eachAttribute == anAttribute ] ] ] ];
+			leaveAction: [ :aTextEditor | 
+				| left right |
+				aTextEditor text
+					findAttribute: marker1
+					indicesDo: [ :start :end | left := start to: end ].
+				aTextEditor text
+					findAttribute: marker2
+					indicesDo: [ :start :end | right := start to: end ].
+				(left notNil and: [ right notNil ])
+					ifTrue: [ aTextEditor text
+							attributes: {anAttribute}
+							from: left first
+							to: left last.
+						aTextEditor text
+							attributes: {anAttribute}
+							from: right first
+							to: right last ] ].
+	self text
+		attribute: cursorAttribute
+		from: nodeInterval first - 1
+		to: nodeInterval last
 ]
 
 { #category : #'private - styling' }
 LeSnippetStylerVisitor >> styleAutoHiding: anInterval text: aSubText [
-	| anAttribute aMarkerAttribute |
+	| anAttribute aMarkerAttribute cursorAttribute |
 	self showMarkup
 		ifTrue: [ ^ self ].
 		
@@ -372,8 +384,8 @@ LeSnippetStylerVisitor >> styleAutoHiding: anInterval text: aSubText [
 	(self isCursorInside: anInterval)
 		ifFalse: [ aSubText attribute: anAttribute ].
 
-	aSubText
-		onCursorEnter: [ :aTextEditor |
+	cursorAttribute := BrTextCursorAttribute new
+			enterAction: [ :aTextEditor | 
 			"we have a reference to the attribute instance. find its interval dynamically"
 			aTextEditor text
 				findAttribute: aMarkerAttribute
@@ -381,17 +393,23 @@ LeSnippetStylerVisitor >> styleAutoHiding: anInterval text: aSubText [
 					cursorIndex := aTextEditor cursors first position.
 					"and now that we know valid attribute indices we can work with them"
 					(cursorIndex between: aStart-2 and: anEnd) ifTrue:
-						[ (aTextEditor text
-							from: aStart
-							to: anEnd) clearAttributes: [ :eachAttribute | eachAttribute == anAttribute ] ] ] ]
+						[ aTextEditor text
+							clearAttributes: aStart
+							to: anEnd 
+							if: [ :eachAttribute | eachAttribute == anAttribute ] ] ] ];
 
-		leave: [ :aTextEditor |
+		leaveAction: [ :aTextEditor |
 			aTextEditor text
 				findAttribute: aMarkerAttribute
 				indicesDo: [ :aStart :anEnd |
-					(aTextEditor text 
+					aTextEditor text
+						attribute: anAttribute  
 						from: aStart
-						to: anEnd) attribute: anAttribute ] ]
+						to: anEnd ] ].
+	self text
+		attribute: cursorAttribute
+		from: anInterval first - 1
+		to: anInterval last
 ]
 
 { #category : #'private - styling' }
@@ -422,25 +440,25 @@ LeSnippetStylerVisitor >> styleCodeBlock: aCodeNode [
 		ifTrue: [ self styleSmalltalkCodeBlock: aCodeNode ].
 	(self text from: aCodeNode startPosition to: aCodeNode stopPosition)
 		glamorousCodeFont.
-	self
+	"self
 		styleAutoHiding: (aCodeNode startPosition to: aCodeNode code startPosition - 1)
 		and: (aCodeNode code stopPosition + 1 to: aCodeNode stopPosition)
-		whenOutside: aCodeNode sourceInterval.
+		whenOutside: aCodeNode sourceInterval."
 	aCodeNode isForSmalltalk
 		ifTrue: [ (text from: aCodeNode stopPosition to: aCodeNode stopPosition)
 				attributes:
 					{(GtButtonAttribute new
 						beAppend;
-						stencil: [ BrButton new
-								aptitude: BrGlamorousButtonWithIconAptitude;
-								beSmallSize;
-								margin: (BlInsets left: 3 right: 3);
+						stencil: [ GtButtonStencil new
 								icon: BrGlamorousVectorIcons play;
+								tooltip: 'Execute';
 								action:
 										[ :aWidget :aButtonModel | self evaluateCodeBlock: aCodeNode expanded: false from: aWidget ] ]).
 					(GtButtonAttribute new
 						beAppend;
 						stencil: [ GtButtonStencil new
+								icon: BrGlamorousVectorIcons playinspect;
+								tooltip: 'Inspect';
 								action:
 									[ :aWidget :aButtonModel | self evaluateCodeBlock: aCodeNode expanded: true from: aWidget ] ])}.
 			self executionResults
@@ -502,21 +520,23 @@ LeSnippetStylerVisitor >> styleFileSelection: aLink text: aSubText [
 
 { #category : #'private - styling' }
 LeSnippetStylerVisitor >> styleHeader: aHeaderNode [
+	aHeaderNode parts isEmpty ifTrue: [ ^ self ].
 
-	aHeaderNode parts isEmpty
-		ifTrue: [ ^ self ].
-
-	(self text
-		from: aHeaderNode startPosition
-		to: aHeaderNode stopPosition)
-			bold;
-			fontSize: (self fontSizeForHeadingLevel: aHeaderNode headerLevel). 
-
+	(self text from: aHeaderNode startPosition to: aHeaderNode stopPosition)
+		bold;
+		fontSize: (self fontSizeForHeadingLevel: aHeaderNode headerLevel).
 	self
-		styleAutoHiding: aHeaderNode sourceInterval
+		styleAutoHiding: (aHeaderNode hidingInterval)
 		text: (self text
-			from: aHeaderNode startPosition
-			to: (aHeaderNode numberSigns last stopPosition min: aHeaderNode stopPosition))
+				from: aHeaderNode hidingStartPosition
+				to: aHeaderNode hidingStopPosition).
+	aHeaderNode startPosition > 1
+		ifTrue: [ (self text from: aHeaderNode startPosition to: aHeaderNode stopPosition)
+				paragraphMargin: (BlInsets
+						top: (5 - aHeaderNode numberSigns size max: 1) * 10
+						left: 0
+						bottom: 5
+						right: 0) ]
 ]
 
 { #category : #'private - styling' }
@@ -539,32 +559,53 @@ LeSnippetStylerVisitor >> styleLinkButton: aLink text: aSubText [
 	aSubText
 		appendingAdornment: [ :aTBrTextEditorTextualPiece :anEditorElement | 
 			| button page highlight |
-
 			page := self snippetViewModel snippetModel outgoingTextualLinks
-				detect: [ :eachLink | eachLink node = aLink ]
-				ifFound: [ :theLink | theLink target ]
-				ifNone: [ nil ].
+					detect: [ :eachLink | eachLink node = aLink ]
+					ifFound: [ :theLink | theLink target ]
+					ifNone: [ nil ].
 
 			highlight := referencedPage notNil and: [ page == referencedPage ].
 
 			button := self class
-				textLinkButtonPadding: aTBrTextEditorTextualPiece wordPadding 
-				margin: aTBrTextEditorTextualPiece wordMargin
-				valid: page isNotNil.
+					textLinkButtonPadding: aTBrTextEditorTextualPiece wordPadding
+					margin: aTBrTextEditorTextualPiece wordMargin
+					valid: page isNotNil.
 
 			button model: page.
-	
-			highlight ifTrue: [
-				button
-					aptitude: (BrGlamorousLinkButtonLabelAptitude new
-						labelDo: [ :aLabelElement | aLabelElement padding: (BlInsets all: 0) ]);
-					addAptitude: (BrGlamorousLinkButtonExteriorInnerAptitude new
-						backgroundPaint: (BrGlamorousColors textHighlightColor alpha: 0.5));
-					geometry: (BlRoundedRectangleGeometry cornerRadius: 4) ].
-	
+
+			highlight
+				ifTrue: [ button
+						aptitude: (BrGlamorousLinkButtonLabelAptitude new
+								labelDo: [ :aLabelElement | aLabelElement padding: (BlInsets all: 0) ]);
+						addAptitude: (BrGlamorousLinkButtonExteriorInnerAptitude new
+								backgroundPaint: (BrGlamorousColors textHighlightColor alpha: 0.5));
+						geometry: (BlRoundedRectangleGeometry cornerRadius: 4) ].
+
 			button
 				label: aLink linkUID;
-				action: [ :aButton | self snippetViewModel snippetModel spawnLinkTarget: aLink from: aButton ].
+				action: [ :aButton | 
+					self snippetViewModel snippetModel
+						spawnLinkTarget: aLink
+						from: aButton
+						inNewTab: false ].
+
+			button viewModel
+				when: BlClickEvent
+				do: [ :anEvent | 
+					anEvent modifiers isPrimaryModifier
+						ifTrue: [ self snippetViewModel snippetModel
+								spawnLinkTarget: aLink
+								from: button
+								inNewTab: true ] ].
+			button viewModel
+				when: BlMouseEnterEvent
+				do: [ :anEvent | 
+					anEvent consumed: true.
+					anEvent modifiers isPrimaryModifier
+						ifTrue: [ anEvent target mouseCursor: BlCopyCursor new ]
+						ifFalse: [ anEvent target mouseCursor: nil ].
+					anEvent target requestFocus ].
+
 			button ]
 ]
 
@@ -581,21 +622,40 @@ LeSnippetStylerVisitor >> styleLinkText: aSubText valid: hasValidTarget [
 
 { #category : #'private - styling' }
 LeSnippetStylerVisitor >> styleOpenExternalImage: aLink text: aSubText [
-	| anImageURL attribute |
-	
+	| anImageURL attribute pictureContainer widget |
 	anImageURL := (self resolveUrl: aLink url) url asString.
 
 	attribute := BrTextAdornmentDynamicAttribute new
-		beAppend;
-		withCache: self elements key: anImageURL;
-		stencil: [
-			(BlUrlImageElement new url: anImageURL)
-				constraintsDo: [ :c |
-					c horizontal matchParent.
-					c vertical matchParent.
-					c maxHeight: 300. ];
-				margin: (BlInsets right: 20) ].
-	
+			beAppend;
+			withCache: self elements key: anImageURL;
+			stencil: [ pictureContainer := BlElement new
+						constraintsDo: [ :c | 
+							c horizontal matchParent.
+							c vertical fitContent ];
+						layout: BlLinearLayout vertical;
+						padding: (BlInsets
+								top: 5
+								left: 7
+								bottom: 5
+								right: 5);
+						yourself.
+
+				widget := (BrAsyncFileWidget new url: anImageURL)
+						constraintsDo: [ :c | 
+							c horizontal matchParent.
+							c vertical exact: 300 ].
+				pictureContainer addChild: widget as: #imageElement.
+				pictureContainer
+					addAptitude: (BrGlamorousWithVerticalResizerAptitude new beBottom
+							resizerDo: [ :theResizer | 
+								theResizer
+									when: BlResizerResizedEvent
+									do: [ :anEvent | 
+										pictureContainer
+											childWithId: #imageElement
+											ifFound: [ :anImageElement | (BrResizerElementLength exact: anEvent extent y) adjustHeightFor: anImageElement ]
+											ifNone: [  ] ] ]) ].
+
 	aSubText attribute: attribute
 ]
 
@@ -606,16 +666,18 @@ LeSnippetStylerVisitor >> styleOpenExternalLinkButton: aLink text: aSubText [
 	aSubText
 		appendingAdornment: [ :aTBrTextEditorTextualPiece :anEditorElement | 
 			| button oldLook |
-			button := self class textLinkButtonPadding: aTBrTextEditorTextualPiece wordPadding 
-										margin: aTBrTextEditorTextualPiece wordMargin.
+			button := self class
+					textLinkButtonPadding: aTBrTextEditorTextualPiece wordPadding
+					margin: aTBrTextEditorTextualPiece wordMargin.
 			oldLook := button aptitude.
 			button
 				removeAptitude: oldLook;
-				addAptitude: (BrGlamorousButtonLabelAndIconAptitude new
-							defaultColor: oldLook defaultColor);
+				addAptitude: (BrGlamorousButtonLabelAndIconAptitude new defaultColor: oldLook defaultColor);
+				addAptitude: (BrGlamorousWithExplicitTooltipAptitude text: aLink url asString asRopedText);
 				icon: BrGlamorousVectorIcons link;
 				label: aLink displayLabel;
-				action: [ :aButton | | urlUtility |
+				action: [ :aButton | 
+					| urlUtility |
 					urlUtility := self resolveUrl: aLink url.
 					urlUtility isFile
 						ifTrue: [ aButton phlow spawnObject: urlUtility asFileReference ]
@@ -628,7 +690,7 @@ LeSnippetStylerVisitor >> styleResult: result for: aCodeNode [
 	| evaluatedCodeAttribute |
 	results add: result.
 
-	result expanded
+	"result expanded
 		ifTrue: [
 			| previewAttribute |
 			
@@ -641,28 +703,25 @@ LeSnippetStylerVisitor >> styleResult: result for: aCodeNode [
 			text
 				attribute: previewAttribute
 				from: aCodeNode stopPosition
-				to: aCodeNode stopPosition ].
+				to: aCodeNode stopPosition ]."
 
 	evaluatedCodeAttribute := GtPlaygroundEvaluatedCodeButtonAttribute new
-		result: result;
-		action: [
-			result expanded: true.
-			self editor styleText ].
-
-	text
-		attribute: evaluatedCodeAttribute;
+		result: result value;
+		action: [ :aButton :anEvent |
+			aButton phlow spawnObject: result value ].
+	(text
 		from: aCodeNode code startPosition + result position - 1
-		to: aCodeNode code startPosition + result position - 1
+		to: aCodeNode code startPosition + result position - 1)
+		attributes: {evaluatedCodeAttribute}
+
 ]
 
 { #category : #'private - styling' }
 LeSnippetStylerVisitor >> styleSmalltalkCodeBlock: aCodeNode [
-	| styler strategy |
-	styler := BrRBTextStyler new.
-	strategy := GtHighlightingBindingStrategy new
-		bindings: self variableBindings.
-	styler workspace: strategy.
-	styler
+	| aStyler |
+	aStyler := BrRBTextStyler new.
+	aStyler workspace: self variableBindings.
+	aStyler
 		style:
 			(text
 				from: aCodeNode code startPosition
@@ -691,7 +750,7 @@ LeSnippetStylerVisitor >> text: anObject [
 
 { #category : #evaluating }
 LeSnippetStylerVisitor >> variableBindings [
-	^ GtSnippetBindings new
+	^ GtSharedVariablesBindings new
 ]
 
 { #category : #visiting }

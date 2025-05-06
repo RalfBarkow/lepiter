@@ -5,7 +5,10 @@ Class {
 		'page',
 		'pageElement',
 		'resizerElement',
-		'widthStrategy'
+		'widthStrategy',
+		'playgroundPageStrategy',
+		'databasesRegistry',
+		'externalSnippetContext'
 	],
 	#category : #'Lepiter-Playground'
 }
@@ -20,15 +23,51 @@ LeInspectorPlaygroundElement >> collapse [
 	self height: self minimumHeight.
 ]
 
+{ #category : #'private - accessing' }
+LeInspectorPlaygroundElement >> currentPlaygroundPageStrategy [
+	^ playgroundPageStrategy ifNil: [
+		self object gtPlaygroundPageStrategy ]
+]
+
+{ #category : #'private - accessing' }
+LeInspectorPlaygroundElement >> databasesRegistry [
+	^ databasesRegistry ifNil: [
+			LeDatabasesRegistry default ]
+]
+
+{ #category : #accessing }
+LeInspectorPlaygroundElement >> databasesRegistry: aDatabasesRegistry [
+	databasesRegistry := aDatabasesRegistry
+]
+
+{ #category : #initialization }
+LeInspectorPlaygroundElement >> defaultPlaygroundHeight [
+	^ 200
+]
+
 { #category : #'api - visibility' }
 LeInspectorPlaygroundElement >> expand [
 	widthStrategy adjustHeightFor: self.
+	self tryToFocusFirstSnippet
+]
+
+{ #category : #accessing }
+LeInspectorPlaygroundElement >> externalSnippetContext [
+	<return: #LeExternalSnippetContext>
+	
+	^ externalSnippetContext
+]
+
+{ #category : #accessing }
+LeInspectorPlaygroundElement >> externalSnippetContext: anExternalSnippetContext [
+	externalSnippetContext := anExternalSnippetContext
 ]
 
 { #category : #initialization }
 LeInspectorPlaygroundElement >> initialize [
 	super initialize.
-	widthStrategy := BrResizerElementLength exact: self minimumHeight.
+
+	widthStrategy := BrResizerElementLength exact: self defaultPlaygroundHeight.
 	
 	self initializePageElement.
 	
@@ -36,6 +75,7 @@ LeInspectorPlaygroundElement >> initialize [
 	self constraintsDo: [ :c | 
 			c horizontal matchParent.
 			c vertical fitContent ].
+	self clipChildren: false.
 
 	"resizer is added in this method"
 	self initializeResizerElement.
@@ -47,23 +87,28 @@ LeInspectorPlaygroundElement >> initialize [
 		background: self theme default contentBackgroundColor;
 		aptitude: BrShadowAptitude;
 		addChild: self pageElement as: #page).
-	self addAptitude: BrLayoutResizerAptitude new hInherit.
 ]
 
 { #category : #initialization }
 LeInspectorPlaygroundElement >> initializePageElement [
 	pageElement := LePageToolContentTreeElement new 
 		withEmptyHeader;
-		rootItemsSelector: LeChildrenSelector default;
 		beInSingleCompositionLayer;
 		matchParent
 ]
 
 { #category : #initialization }
 LeInspectorPlaygroundElement >> initializeResizerElement [
-	self
-		addAptitude: (BrGlamorousWithVerticalResizerAptitude new beTop
-		resizerDo: [ :theResizer | resizerElement := theResizer ]).
+	resizerElement := BrResizer new
+		id: LeInspectorPlaygroundResizerId;
+		aptitude: BrGlamorousHandleBarResizerAptitude;
+		elevation: (BlRelativeElevation elevation: 1000);
+		constraintsDo: [ :c | c ignoreByLayout ];
+		beTop;
+		target: self.
+
+	self addChild: resizerElement.
+
 	self resizerElement
 		when: BlResizerResizedEvent
 			do: [ :anEvent | self onResizerResized: anEvent ];
@@ -78,29 +123,30 @@ LeInspectorPlaygroundElement >> isCollapsed [
 ]
 
 { #category : #'private - accessing' }
+LeInspectorPlaygroundElement >> locateDefaultPlaygroundDatabase [
+	^ self databasesRegistry currentLoadedDefaultLogicalDatabase playgroundDB
+]
+
+{ #category : #'private - accessing' }
 LeInspectorPlaygroundElement >> locatePageForObject [
-	| database currentPage |
-	database := LeDatabasesRegistry uniqueInstance currentLoadedDefaultLogicalDatabase
-		playgroundDB.
-	currentPage := database
-		at: self object class name
-		ifPresent: [ :aPage | aPage ]
-		ifAbsent: [ page := LePage pharoClassName: self object class name.
-			page addSnippet: LePharoSnippet new.
-			database addPage: page.
-			page ]
-		forPageType: LePharoClassPageType.
+	| currentPage |
+	
+	currentPage := self currentPlaygroundPageStrategy
+		ensurePlaygroundPageInDatabase: self locateDefaultPlaygroundDatabase
+		forObject: self object.
+	
 	^ currentPage
 ]
 
 { #category : #'private - accessing' }
 LeInspectorPlaygroundElement >> minimumHeight [
-	^ 5
+	^ 8
 ]
 
 { #category : #'private - hooks' }
 LeInspectorPlaygroundElement >> onObjectHolderChanged [
 	super onObjectHolderChanged.
+	
 	self updatePage.
 ]
 
@@ -129,16 +175,40 @@ LeInspectorPlaygroundElement >> pageElement [
 	^ pageElement
 ]
 
+{ #category : #accessing }
+LeInspectorPlaygroundElement >> playgroundPageStrategy: aPlaygroundPageStrategy [
+	playgroundPageStrategy := aPlaygroundPageStrategy
+]
+
 { #category : #'private - accessing' }
 LeInspectorPlaygroundElement >> resizerElement [
 	^ resizerElement
 ]
 
 { #category : #'private - updating' }
-LeInspectorPlaygroundElement >> updatePage [
+LeInspectorPlaygroundElement >> tryToFocusFirstSnippet [
+	self pageElement snippetsViewModel
+		allChildrenBreadthFirstDo: [ :c | 
+			c focused: true.
+			^ self ]
+]
 
+{ #category : #'private - updating' }
+LeInspectorPlaygroundElement >> updatePage [
+	| pageViewModel |
+	
 	page := self locatePageForObject.
-	self pageElement pageViewModel: (LePageViewModel new pageModel: page).
+	
+	pageViewModel := page asContentUIModel.
+	pageViewModel externalSnippetContext: self externalSnippetContext.
+	self objectHolder configurePageViewModel: pageViewModel.
+	
+	"self object isContext ifTrue: [
+		""In case this object is a Contect set it as the runtime context.""
+		pageViewModel sharedSnippetContext 
+			pharoRuntimeContext: self object ]."
+		
+	self pageElement pageViewModel: pageViewModel.
 	self pageElement pageViewModel receiver: self object.
 ]
 

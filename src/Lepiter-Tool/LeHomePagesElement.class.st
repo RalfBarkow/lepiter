@@ -18,17 +18,7 @@ LeHomePagesElement >> isForTodayNote [
 
 { #category : #'private - event handling' }
 LeHomePagesElement >> onPageClick: aLePageViewModel [
-	
-	GtWorldUtility 
-		showSpaceWithTitle: aLePageViewModel printPageTabLabel
-		icon: LeIcons lepiterPage
-		inPagerWith: [ aLePageViewModel asPhlowTool asElementDo: [ :e | e ] ] asStencil
-		from: self
-	
-	"GtWorldUtility 
-		showSpaceWithTitle: aLePageViewModel printPageTabLabel
-		inPagerWith: [ aLePageViewModel asPhlowTool asElementDo: [ :e | e ] ] asStencil
-		from: self"
+	BlSpace spawnPage: aLePageViewModel pageModel from: self
 ]
 
 { #category : #'private - accessing' }

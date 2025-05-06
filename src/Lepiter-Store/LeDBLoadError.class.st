@@ -6,21 +6,26 @@ Class {
 	#name : #LeDBLoadError,
 	#superclass : #Error,
 	#instVars : [
-		'fileReference',
 		'reason',
-		'originalException'
+		'originalException',
+		'pageUid',
+		'properties',
+		'pageTitle'
 	],
 	#category : #'Lepiter-Store-Exceptions'
 }
 
 { #category : #accessing }
-LeDBLoadError >> fileReference [
-	^ fileReference
+LeDBLoadError >> initialize [
+
+	super initialize.
+	properties := Dictionary new.
 ]
 
-{ #category : #accessing }
-LeDBLoadError >> fileReference: anObject [
-	fileReference := anObject
+{ #category : #printing }
+LeDBLoadError >> messageText [
+	^ messageText ifNil: [ 
+		messageText := self standardMessageText ]
 ]
 
 { #category : #accessing }
@@ -33,13 +38,29 @@ LeDBLoadError >> originalException: anObject [
 	originalException := anObject
 ]
 
-{ #category : #printing }
-LeDBLoadError >> printOn: aStream [
+{ #category : #accessing }
+LeDBLoadError >> pageTitle [
+	^ pageTitle
+]
 
-	aStream
-		print: reason;
-		<< ' in ';
-		print: fileReference
+{ #category : #accessing }
+LeDBLoadError >> pageTitle: anObject [
+	pageTitle := anObject
+]
+
+{ #category : #accessing }
+LeDBLoadError >> pageUid [
+	^ pageUid
+]
+
+{ #category : #accessing }
+LeDBLoadError >> pageUid: anObject [
+	pageUid := anObject
+]
+
+{ #category : #accessing }
+LeDBLoadError >> properties [
+	^ properties
 ]
 
 { #category : #accessing }
@@ -50,4 +71,13 @@ LeDBLoadError >> reason [
 { #category : #accessing }
 LeDBLoadError >> reason: anObject [
 	reason := anObject
+]
+
+{ #category : #printing }
+LeDBLoadError >> standardMessageText [
+	^ String streamContents: [ :aStream | 
+		aStream
+			print: reason;
+			<< ' in page ';
+			print: pageTitle ]
 ]

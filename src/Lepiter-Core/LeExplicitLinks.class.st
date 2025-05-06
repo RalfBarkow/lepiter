@@ -22,7 +22,8 @@ LeExplicitLinks >> addLink: aLink [
 	self assert: [ aLink linkUuid notNil ] description: 'Here links should have a unique id'.
 	self assert: [ (self hasExplicitLinkUID: aLink linkUuid) not ].
 	
-	externalLinksByUuid at: aLink linkUuid put: aLink
+	externalLinksByUuid at: aLink linkUuid put: aLink.
+	self clearStorageHash
 ]
 
 { #category : #accessing }
@@ -43,6 +44,11 @@ LeExplicitLinks >> at: aLinkUuid ifPresent: aPresentBlock ifAbsent: anAbsentBloc
 		at: aLinkUuid 
 		ifPresent: aPresentBlock 
 		ifAbsent: anAbsentBlock
+]
+
+{ #category : #'api - updating' }
+LeExplicitLinks >> clearStorageHash [
+	self clearOption: #storageHash ifAbsent: [ "ignore" ]
 ]
 
 { #category : #'private-for tests' }
@@ -96,12 +102,18 @@ LeExplicitLinks >> gtViewExplicitLinksFor: aView [
 		title: 'Explicit links';
 		items: [ self items ];
 		priority: 10;
-		column: 'Type' text: [ :anExplicitLink | 
-			anExplicitLink class ] weight: 0.5;
-		column: 'Origin' text: [ :anExplicitLink | 
-			anExplicitLink originReference description ];
-		column: 'Target' text: [ :anExplicitLink | 
-			anExplicitLink targetReference description ]
+		column: 'Type'
+			text: [ :anExplicitLink | anExplicitLink class ]
+			weight: 0.5;
+		column: 'Origin'
+			text: [ :anExplicitLink | anExplicitLink originReference description ];
+		column: 'Target'
+			text: [ :anExplicitLink | anExplicitLink targetReference description ];
+		column: 'Status'
+			text: [ :anExplicitLink | 
+				anExplicitLink targetReference status
+					in: [ :aStatus | aStatus label asRopedText foreground: aStatus color ] ]
+			width: 100
 ]
 
 { #category : #testing }
@@ -126,9 +138,19 @@ LeExplicitLinks >> isEmpty [
 	^ externalLinksByUuid isEmpty
 ]
 
+{ #category : #'api - testing' }
+LeExplicitLinks >> isExplicitLinks [
+	^ true
+]
+
 { #category : #testing }
 LeExplicitLinks >> isNotEmpty [
 	^ externalLinksByUuid isNotEmpty
+]
+
+{ #category : #'api - testing' }
+LeExplicitLinks >> isPage [
+	^ false
 ]
 
 { #category : #accessing }
@@ -165,6 +187,7 @@ LeExplicitLinks >> printOn: aStream [
 
 { #category : #removing }
 LeExplicitLinks >> remove: anExplicitLink ifAbsent: aBlock [
+	self clearStorageHash.
 	^ externalLinksByUuid 
 		removeKey: anExplicitLink linkUuid 
 		ifAbsent: aBlock
@@ -172,6 +195,7 @@ LeExplicitLinks >> remove: anExplicitLink ifAbsent: aBlock [
 
 { #category : #removing }
 LeExplicitLinks >> removeAll: aCollectionOfLinks [ 
+	self clearStorageHash.
 	aCollectionOfLinks do: [ :anExplicitLink |
 		externalLinksByUuid 
 			removeKey: anExplicitLink linkUuid 
@@ -187,6 +211,16 @@ LeExplicitLinks >> select: aBlock [
 { #category : #accessing }
 LeExplicitLinks >> size [ 	
 	^ externalLinksByUuid size
+]
+
+{ #category : #'api - updating' }
+LeExplicitLinks >> storageHash [
+	^ self optionAt: #storageHash ifAbsent: [ nil ]
+]
+
+{ #category : #'api - updating' }
+LeExplicitLinks >> storageHash: aLeBinaryContentsHash [ 
+	^ self optionAt: #storageHash put: aLeBinaryContentsHash
 ]
 
 { #category : #accessing }

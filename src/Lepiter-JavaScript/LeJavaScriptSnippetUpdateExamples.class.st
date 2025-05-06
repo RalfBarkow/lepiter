@@ -4,7 +4,18 @@ Class {
 	#category : #'Lepiter-JavaScript-Examples'
 }
 
-{ #category : #'examples - snippets' }
+{ #category : #asserting }
+LeJavaScriptSnippetUpdateExamples >> assertModificationAnnouncements: anAnnouncementsCollection [
+	self 
+		assertOneModificationAnnouncementIn: anAnnouncementsCollection 
+		ofType: LeSnippetTextChanged 
+		do: [ :anAnnouncement |
+			self 
+				assert: anAnnouncement snippet string 
+				equals: '1+2+3' ]
+]
+
+{ #category : #asserting }
 LeJavaScriptSnippetUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 	self assert: targetSnippet code equals: '1+2+3'.
 ]
@@ -12,6 +23,7 @@ LeJavaScriptSnippetUpdateExamples >> assertSnippetModifiedFor: targetSnippet [
 { #category : #'examples - snippets' }
 LeJavaScriptSnippetUpdateExamples >> createTargetSnippet [
 	<gtExample>
+	<return: #LeJavaScriptSnippet>
 	^ LeJavaScriptSnippet code: '1+2'
 ]
 

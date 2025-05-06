@@ -3,7 +3,8 @@ Class {
 	#superclass : #LePhlowTool,
 	#instVars : [
 		'page',
-		'shouldFocusFirstSnippet'
+		'shouldFocusFirstSnippet',
+		'externalSnippetContext'
 	],
 	#category : #'Lepiter-UI-Phlow Tools'
 }
@@ -15,16 +16,20 @@ LePagePhlowTool class >> page: aPage [
 
 { #category : #'api - converting' }
 LePagePhlowTool >> asElementDo: aOneArgBlock [
+
 	| aPageViewModel anElement |
-	aPageViewModel := LePageViewModel new
-		pageModel: self page;
-		shouldFocusFirstSnippet: self shouldFocusFirstSnippet.
+	aPageViewModel := self page
+		 asContentUIModel
+		 shouldFocusFirstSnippet: self shouldFocusFirstSnippet.
+	
+	externalSnippetContext ifNotNil: [
+		aPageViewModel externalSnippetContext: externalSnippetContext ].
 
 	anElement := LePageToolElement new
-		pageViewModel: aPageViewModel;
-		matchParent.
-	anElement
-		selectionTransformation: [ :aNode | aNode value asPhlowTool ].
+		             pageViewModel: aPageViewModel;
+		             matchParent.
+	anElement selectionTransformation: [ :aNode | 
+		aNode value asPhlowTool ].
 	^ aOneArgBlock cull: anElement
 ]
 
@@ -38,6 +43,11 @@ LePagePhlowTool >> asTabElement [
 			aWish currentTarget
 				fireEvent: (GtPhlowToolObjectChangeWish new object: aWish pageUIModel pageModel) ].
 	^ anElement
+]
+
+{ #category : #accessing }
+LePagePhlowTool >> externalSnippetContext: anExternalSnippetContext [
+	externalSnippetContext := anExternalSnippetContext
 ]
 
 { #category : #'api - accessing' }

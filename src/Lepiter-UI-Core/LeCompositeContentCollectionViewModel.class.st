@@ -32,6 +32,15 @@ LeCompositeContentCollectionViewModel >> content: aLeContent [
 		do: [ :eachCollection | eachCollection content: aLeContent ]
 ]
 
+{ #category : #'gt - extensions' }
+LeCompositeContentCollectionViewModel >> gtViewModelsFor: aView [
+	<gtView>
+	
+	^ aView list 
+		title: 'View models';
+		items: [ viewModelCollections ]
+]
+
 { #category : #initialization }
 LeCompositeContentCollectionViewModel >> initialize [
 	super initialize.
@@ -40,11 +49,12 @@ LeCompositeContentCollectionViewModel >> initialize [
 ]
 
 { #category : #'api - scrolling' }
-LeCompositeContentCollectionViewModel >> takeViewModelToScrollTo [
+LeCompositeContentCollectionViewModel >> takeViewModelToScrollToIf: aBlock [
+	"Evaluate a given block with a pending view model to scroll to
+	and if aBlock returns true, forget that view model and consider scrolling request to be fulfilled"
+	
 	viewModelCollections do: [ :eachViewModel |
-		eachViewModel takeViewModelToScrollTo
-			ifNotNil: [ :aViewModel | ^ aViewModel ] ].
-	^ nil
+		eachViewModel takeViewModelToScrollToIf: aBlock ]
 ]
 
 { #category : #private }
@@ -53,4 +63,9 @@ LeCompositeContentCollectionViewModel >> updateChildren [
 	This may happen when items are added or removed from the collection"
 	
 	viewModelCollections do: [ :eachCollection | eachCollection updateChildren ]
+]
+
+{ #category : #accessing }
+LeCompositeContentCollectionViewModel >> viewModelCollections [
+	^ viewModelCollections
 ]

@@ -3,7 +3,7 @@ LeImageImport visits the supplied lepiter model and updates all textual and pict
 
 The database must have a monitor, i.e. a root directory where the images are attached.
 
-The database can either be implicitly supplied by visiting it, or explicitly set with {{gtMethod:name=LeImageImport>>#database:}}.
+The database can either be implicitly supplied by visiting it, or explicitly set with {{gtMethod:name=LeImageImportVisitor>>#database:}}.
 
 If the original source URL of the image is to be saved as metadata, the database must have savePersonalInformation true, i.e.:
 
@@ -110,7 +110,7 @@ LeImageImportVisitor >> gtAddedImagesFor: aView [
 
 	addedImages ifEmpty: [ ^ aView empty ].
 	^ aView list 
-		title: 'Added Images';
+		title: 'Added images';
 		priority: 10;
 		items: [ addedImages associations ];
 		itemText: [ :item | item key ];
@@ -123,7 +123,7 @@ LeImageImportVisitor >> gtFailedImagesFor: aView [
 
 	addedImages ifEmpty: [ ^ aView empty ].
 	^ aView list 
-		title: 'Failed Images';
+		title: 'Failed images';
 		priority: 11;
 		items: [ failedImages associations ];
 		itemText: [ :item | item key ];

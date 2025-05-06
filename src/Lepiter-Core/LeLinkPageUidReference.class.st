@@ -34,6 +34,11 @@ LeLinkPageUidReference >> description [
 ]
 
 { #category : #testing }
+LeLinkPageUidReference >> isExistingPage [
+	^ self explicitLink database hasPageUID: self pageUid.
+]
+
+{ #category : #testing }
 LeLinkPageUidReference >> isReferencingContent: aLeContent [ 
 	self assert: [ aLeContent notNil ].
 	
@@ -67,6 +72,13 @@ LeLinkPageUidReference >> resolveInDatabase: aDatabase [
 		ifPresent: [ :aPage | 
 			self basicContent: aPage ] 
 		ifAbsent: [ "self inform: 'Could not find page for uuid ', self pageUid asString" ]
+]
+
+{ #category : #accessing }
+LeLinkPageUidReference >> status [
+	^ self isExistingPage
+		ifTrue: [ LeLinkReferenceStatus exists ]
+		ifFalse: [ LeLinkReferenceStatus notFound ]
 ]
 
 { #category : #accessing }

@@ -4,7 +4,18 @@ Class {
 	#category : #'Lepiter-Snippet-WardleyMap-Examples'
 }
 
-{ #category : #'examples - snippets' }
+{ #category : #asserting }
+LeWardleyMapSnippetHeightUpdateExamples >> assertModificationAnnouncements: anAnnouncementsCollection [
+	self 
+		assertOneModificationAnnouncementIn: anAnnouncementsCollection 
+		ofType: LeSnippetHeightChanged 
+		do: [ :anAnnouncement |
+			self 
+				assert: anAnnouncement snippet height 
+				equals: 321 ]
+]
+
+{ #category : #asserting }
 LeWardleyMapSnippetHeightUpdateExamples >> assertSnippetModifiedFor: aSnippet [ 
 	self 
 		assert: aSnippet wardleyMap
@@ -17,8 +28,8 @@ LeWardleyMapSnippetHeightUpdateExamples >> assertSnippetModifiedFor: aSnippet [
 { #category : #'examples - snippets' }
 LeWardleyMapSnippetHeightUpdateExamples >> createTargetSnippet [
 	<gtExample>
-	^ LeWardleyMapSnippet new
-		wardleyMap: self wardleyMapWithNode
+	<return: #LeWardleyMapSnippet>
+	^ LeWardleyMapSnippet new wardleyMap: self wardleyMapWithNode
 ]
 
 { #category : #'examples - snippets' }

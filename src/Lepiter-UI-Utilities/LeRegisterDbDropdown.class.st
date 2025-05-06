@@ -68,7 +68,7 @@ LeRegisterDbDropdown >> initializeDropdownElement [
 
 	dropdownElement := self newButton
 		label: self tooltip;
-		addAptitude: (BrGlamorousWithDropdownAptitude
+		addAptitude: (BrGlamorousWithExplicitDropdownAptitude
 			handle: [ self newDropdownButton ]
 			content: [ self reusedDropdownContent ])
 ]
@@ -91,13 +91,11 @@ LeRegisterDbDropdown >> newButton [
 
 { #category : #private }
 LeRegisterDbDropdown >> newDropdownButton [
-
 	^ BrButton new
 		icon: self statusIcon;
 		label: self tooltip;
-		aptitude: 	BrGlamorousButtonWithIconAptitude 
-			- BrGlamorousButtonWithLabelTooltipAptitude
-			- BrGlamorousButtonExteriorAptitude 
+		aptitude: BrGlamorousButtonWithIconAptitude - BrGlamorousButtonWithLabelTooltipAptitude2
+				- BrGlamorousButtonExteriorAptitude
 ]
 
 { #category : #private }

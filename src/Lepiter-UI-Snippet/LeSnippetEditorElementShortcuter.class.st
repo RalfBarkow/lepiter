@@ -52,7 +52,7 @@ LeSnippetEditorElementShortcuter >> keyboardShortcut: aSymbol [
 LeSnippetEditorElementShortcuter >> loseFocus [
 	self editor
 		"Lose focus LeBlock"
-		addEditorShortcut: (BrEditorLoseFocusShortcut new combination: (self keyboardShortcut: #LoseFocus))
+		addEditorShortcut: (BrEditorShortcut loseFocus combination: (self keyboardShortcut: #LoseFocus))
 		
 ]
 

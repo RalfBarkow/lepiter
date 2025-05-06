@@ -37,7 +37,7 @@ LeGitHubEditorModelElement >> initialize [
 	self addChild: self inputFieldsElement as: #inputFields.
 	self addChild: self toolbarElement as: #toolbar.
 	
-	self addAptitude: (BrLayoutResizerAptitude inherit
+	self addAptitude: (BrLayoutResizerAptitude new
 		inherit: self inputFieldsElement;
 		hInherit: self toolbarElement;
 		vAnyToFitContent: self toolbarElement)

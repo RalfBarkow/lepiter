@@ -1,6 +1,15 @@
 Extension { #name : #FileReference }
 
 { #category : #'*Lepiter-Store' }
+FileReference >> asLepiterZnUrl [
+
+	^ ZnUrl new
+		scheme: #file;
+		segments: path segments asOrderedCollection.
+
+]
+
+{ #category : #'*Lepiter-Store' }
 FileReference class >> leFromJsonV3Dictionary: aDictionary [
 	"Create a new instance of the receiver from the supplied dictionary."
 
@@ -37,6 +46,14 @@ FileReference class >> leJsonV3Name [
 ]
 
 { #category : #'*Lepiter-Store' }
+FileReference >> leJsonV4Document [
+	"Answer the contents of the receiver assuming it is a LeJsonV4 document"
+
+	^ self readStreamDo: [ :stream |
+		LeJsonV4 uniqueInstance deserialize: stream ]
+]
+
+{ #category : #'*Lepiter-Store' }
 FileReference class >> leJsonV4MappingFor: aNeoJSONMapper [
 	"Dates are encoded as their type and a single string in default Date format"
 
@@ -56,4 +73,11 @@ FileReference class >> leJsonV4MappingFor: aNeoJSONMapper [
 FileReference class >> leJsonV4Name [
 
 	^ #file
+]
+
+{ #category : #'*Lepiter-Store' }
+FileReference >> lepiterDbUrlEqualsZnUrl: aZnUrl [
+
+	aZnUrl isFile ifFalse: [ ^ false ].
+	^ self = aZnUrl asLepiterFileReference resolve
 ]

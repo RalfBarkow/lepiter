@@ -38,9 +38,8 @@ LeWorldDatabaseExportBadge >> createDropdownExpandedHandleButton [
 	^ BrButton new
 		icon: BrGlamorousIcons savetodisk;
 		label: self tooltip;
-		aptitude: BrGlamorousButtonWithIconAptitude 
-			- BrGlamorousButtonWithLabelTooltipAptitude
-			- BrGlamorousButtonExteriorAptitude
+		aptitude: BrGlamorousButtonWithIconAptitude - BrGlamorousButtonWithLabelTooltipAptitude2
+				- BrGlamorousButtonExteriorAptitude
 ]
 
 { #category : #'building widgets' }
@@ -96,7 +95,7 @@ LeWorldDatabaseExportBadge >> initialize [
 	self
 		icon: BrGlamorousIcons savetodisk;
 		aptitude: BrGlamorousButtonWithIconAptitude.
-	self addAptitude: (BrGlamorousWithDropdownAptitude
+	self addAptitude: (BrGlamorousWithExplicitDropdownAptitude
 		handle: [ self createDropdownExpandedHandleButton ]
 		content: [ self createDropdownContentWithAnchor: self ]).
 		

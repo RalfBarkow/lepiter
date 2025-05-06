@@ -1,7 +1,7 @@
 Class {
 	#name : #LeLabelArgumentNode,
 	#superclass : #LeArgumentNode,
-	#category : #'Lepiter-Parser'
+	#category : 'Lepiter-Parser'
 }
 
 { #category : #generated }
@@ -19,7 +19,7 @@ LeLabelArgumentNode >> labelFor: anObject [
 	| label |
 	label := self stringValue.
 	^ (label beginsWith: '#')
-		ifTrue: [ [ (anObject perform: label allButFirst asSymbol) asString ]
+		ifTrue: [ [ (anObject perform: label allButFirst trimBoth asSymbol) asString ]
 				on: Error
 				do: [ :anException | anException printString ] ]
 		ifFalse: [ label ]

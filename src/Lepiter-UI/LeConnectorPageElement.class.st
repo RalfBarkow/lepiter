@@ -26,12 +26,10 @@ LeConnectorPageElement >> contentElement [
 LeConnectorPageElement >> initialize [
 	super initialize.
 	self layout: BlLinearLayout horizontal.
-	self addInteractiveModelState: GtPhlowToolDetailModel new.
 	
-	self addAptitude: BrLayoutResizerAptitude inherit.
 	self addAptitude: (GtPhlowToolDetailAptitude new
-		normal: [ self actOnNormalVolume ];
-		detailed: [ self actOnDetailedVolume ]).
+		normal: [ :aStyle | aStyle do: [ self actOnNormalVolume ] ];
+		detailed: [ :aStyle | aStyle do: [ self actOnDetailedVolume ] ]).
 		
 	self initializeContentElement.
 	self addChild: self contentElement as: #content.
@@ -40,8 +38,7 @@ LeConnectorPageElement >> initialize [
 { #category : #initialization }
 LeConnectorPageElement >> initializeContentElement [
 	contentElement := LePageToolContentTreeElement new 
-		withTitleAndInspectButton;
-		rootItemsSelector: LeChildrenSelector default;
+		withTitleAndButtons;
 		beInSingleCompositionLayer;
 		matchParent
 ]

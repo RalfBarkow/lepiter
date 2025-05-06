@@ -1,3 +1,8 @@
+"
+LeUID is the model for Lepiter's model IDs.
+
+LeUID initialises a UUID on creation, however this may be overwritten, mostly for controlled examples.
+"
 Class {
 	#name : #LeUID,
 	#superclass : #LeModel,
@@ -16,6 +21,21 @@ LeUID >> = anObject [
 	^ uid = anObject uid
 ]
 
+{ #category : #accessing }
+LeUID >> gtDetailsFor: aView [
+	<gtView>
+	^ aView columnedList
+		title: 'Details';
+		items: [ {
+			('LeUID/UUID Base64' -> self printString).
+			('LeUID/UUID String' -> self uid asString).
+			('LeUID/UUID Base36' -> self uid asString36).
+			('LeUID/UUID Raw' -> self uid) } ];
+		column: 'Key' text: #key;
+		column: 'Value' text: #value;
+		send: #value
+]
+
 { #category : #'api - testing' }
 LeUID >> hasUidString: aString64 [
 
@@ -30,6 +50,13 @@ LeUID >> hash [
 	"Answer an integer value that is related to the identity of the receiver."
 
 	^ uid hash
+]
+
+{ #category : #accessing }
+LeUID >> initialize [
+
+	super initialize.
+	uid := UUID new.
 ]
 
 { #category : #printing }
@@ -58,7 +85,5 @@ LeUID >> uidString [
 { #category : #accessing }
 LeUID >> uidString: aString64 [
 
-	uid := UUID nilUUID.
-	ZnBase64Encoder new decode: aString64 readStream to: uid writeStream.
-
+	uid := UUID fromBase64EncodedString: aString64
 ]

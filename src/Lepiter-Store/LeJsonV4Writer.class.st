@@ -7,11 +7,42 @@ Class {
 	#category : #'Lepiter-Store-JsonV4'
 }
 
+{ #category : #accessing }
+LeJsonV4Writer >> gtMappingsFor: aView [
+	<gtView>
+	^ aView columnedList 
+		title: 'Mappings';
+		items: [ mappings associations sorted: [:a :b | a key name < b key name ] ];
+		column: 'Class' text: #key;
+		column: 'Mapping' text: #value
+]
+
+{ #category : #accessing }
+LeJsonV4Writer >> gtSearchMappingsFor: aSearch [
+	<gtSearch>
+	^ aSearch list 
+		priority: 1;
+		title: 'Mappings';
+		items: [ mappings associations ];
+		filterBySubstring;
+		wantsToDisplayOnEmptyQuery: true;
+		send: #value
+]
+
 { #category : #'initialize-release' }
 LeJsonV4Writer >> on: aStream [
 
 	super on: aStream.
 	firstMappedObject := true.
+]
+
+{ #category : #copying }
+LeJsonV4Writer >> postCopy [
+
+	super postCopy.
+	writeStream := nil.
+	level := 0.
+	firstMappedObject := nil.
 ]
 
 { #category : #writing }

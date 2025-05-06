@@ -1,3 +1,6 @@
+"
+The Python Snippet uses the PythonBridge library to communicate with a Python server via [msgpack](https://github.com/msgpack/msgpack-smalltalk) or HTTP over TCP/IP.
+"
 Class {
 	#name : #LePythonSnippet,
 	#superclass : #LeCodeSnippet,
@@ -9,7 +12,12 @@ LePythonSnippet class >> contextMenuItemSpecification [
 	<leSnippetSpecification>
 	^ LeContextMenuItemSpecification new
 		snippetClass: self;
-		title: 'Python'
+		title: self description
+]
+
+{ #category : #'api - accessing menu' }
+LePythonSnippet class >> description [
+	^ 'Python'
 ]
 
 { #category : #'lepiter-store' }
@@ -39,4 +47,5 @@ LePythonSnippet >> asSnippetViewModel [
 { #category : #initialization }
 LePythonSnippet >> newCoder [
 	^ GtPythonCoderModel new
+		pythonApplicationStrategy: (LePythonApplicationGlobalStrategy new content: self)
 ]
